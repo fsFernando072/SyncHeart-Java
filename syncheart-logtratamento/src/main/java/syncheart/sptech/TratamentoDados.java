@@ -22,9 +22,9 @@ public class TratamentoDados {
         for (Integer i = 0; i < cpu.toArray().length; i++) {
             String modelo = marcapasso.getModelos()[i];
 
-            if (cpu.indexOf(i) <= 0.25) {
+            if (cpu.get(i) <= 0.25) {
                 System.out.println("CPU inativa!!! No modelo: " + modelo);
-            } else if (cpu.indexOf(i) >= 20) {
+            } else if (cpu.get(i) >= 20) {
                 System.out.println("CPU em Sobrecarga!!! No modelo: " + modelo);
             }
         }
@@ -35,7 +35,7 @@ public class TratamentoDados {
         for (Integer i = 0; i < ram.toArray().length; i++) {
             String modelo = marcapasso.getModelos()[i];
 
-            if (ram.indexOf(i) >= 30) {
+            if (ram.get(i) >= 30) {
                 System.out.println("Uso alto de RAM!!! No modelo: " + modelo);
             }
         }
@@ -46,9 +46,9 @@ public class TratamentoDados {
         for (Integer i = 0; i < disco.toArray().length; i++) {
             String modelo = marcapasso.getModelos()[i];
 
-            if (disco.indexOf(i) >= 60) {
+            if (disco.get(i) >= 60) {
                 System.out.println("Disco em 60%! No modelo: " + modelo);
-            } else if (disco.indexOf(i) >= 80) {
+            } else if (disco.get(i) >= 80) {
                 System.out.println("Disco em 80%, risco de perda de dados!!! No modelo: " + modelo);
             }
         }
