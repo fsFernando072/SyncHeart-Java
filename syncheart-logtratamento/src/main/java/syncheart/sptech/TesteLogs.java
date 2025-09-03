@@ -7,14 +7,9 @@ public class TesteLogs {
         System.out.println("DISCO: "+dados.getDisco());
         System.out.println("RAM: "+dados.getRam());
 
-        TratamentoDados alertas = new TratamentoDados();
-        System.out.println("ALERTAS CPU: ");
-        alertas.alertasCPU();
-
-        System.out.println("ALERTAS RAM: ");
-        alertas.alertasRAM();
-
-        System.out.println("ALERTAS DISCO: ");
-        alertas.alertasDisco();
+        TratamentoDados tramento = new TratamentoDados();
+        tramento.alertasCPU();
+        tramento.alertasRAM();
+        tramento.alertasDisco();
     }
 }

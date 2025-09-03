@@ -24,7 +24,7 @@ public class TratamentoDados {
 
             if (cpu.get(i) <= 0.25) {
                 System.out.println("CPU inativa!!! No modelo: " + modelo);
-            } else if (cpu.get(i) >= 20) {
+            } else if (cpu.indexOf(i) >= 20) {
                 System.out.println("CPU em Sobrecarga!!! No modelo: " + modelo);
             }
         }
@@ -48,7 +48,7 @@ public class TratamentoDados {
 
             if (disco.get(i) >= 60) {
                 System.out.println("Disco em 60%! No modelo: " + modelo);
-            } else if (disco.get(i) >= 80) {
+            } else if (disco.indexOf(i) >= 80) {
                 System.out.println("Disco em 80%, risco de perda de dados!!! No modelo: " + modelo);
             }
         }
