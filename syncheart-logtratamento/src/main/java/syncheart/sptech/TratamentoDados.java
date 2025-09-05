@@ -1,55 +1,132 @@
 package syncheart.sptech;
 
 import java.util.ArrayList;
+import java.util.Collections;
 
 public class TratamentoDados {
-    //Atributos
-    private ArrayList<Double> cpu;
-    private ArrayList<Double> ram;
-    private ArrayList<Double> disco;
-    Marcapasso marcapasso = new Marcapasso();
+    private ArrayList<String> alertaCPU;
+    private ArrayList<String> alertaRAM;
+    private ArrayList<String> alertaDisco;
+    private ArrayList<String> alertaCritico;
 
-    //Métodos Setter no Construtor diretamente
-    public TratamentoDados(){
+    public ArrayList<String> getAlertaCPU() {
+        return alertaCPU;
+    }
+
+    public ArrayList<String> getAlertaRAM() {
+        return alertaRAM;
+    }
+
+    public ArrayList<String> getAlertaDisco() {
+        return alertaDisco;
+    }
+
+    public ArrayList<String> getAlertaCritico() {
+        return alertaCritico;
+    }
+
+    public TratamentoDados() {
+        alertaCPU = new ArrayList<>();
+        alertaRAM = new ArrayList<>();
+        alertaDisco = new ArrayList<>();
+        alertaCritico = new ArrayList<>();
+        filtrarCPU();
+        filtrarRAM();
+        filtrarDisco();
+        ordernarAlertas();
+    }
+
+    public void filtrarCPU() {
         ColetaDeDados dados = new ColetaDeDados();
-        this.cpu = dados.getCpu();
-        this.ram = dados.getRam();
-        this.disco = dados.getDisco();
+        for (int i = 0; i < dados.getCpu().toArray().length; i++) {
+            if (dados.getCpu().get(i) > 40) {
+                alertaCPU.add("A - " + dados.getUsuario()[i] + " CPU: " + dados.getCpu().get(i));
+            } else if(dados.getCpu().get(i) > 30) {
+                alertaCPU.add("B - " + dados.getUsuario()[i] + " CPU: " + dados.getCpu().get(i));
+            } else if(dados.getCpu().get(i) > 20) {
+                alertaCPU.add("C - " + dados.getUsuario()[i] + " CPU: " + dados.getCpu().get(i));
+            }
+        }
     }
-
-    //Tratamento de CPU
-    public void alertasCPU(){
-        for (Integer i = 0; i < cpu.toArray().length; i++) {
-            String modelo = marcapasso.getModelos()[i];
-
-            if (cpu.get(i) <= 0.25) {
-                System.out.println("CPU inativa!!! No modelo: " + modelo);
-            } else if (cpu.indexOf(i) >= 20) {
-                System.out.println("CPU em Sobrecarga!!! No modelo: " + modelo);
+    public void filtrarRAM() {
+        ColetaDeDados dados = new ColetaDeDados();
+        for (int i = 0; i < dados.getRam().toArray().length; i++) {
+            if (dados.getRam().get(i) > 70) {
+                alertaRAM.add("A - " + dados.getUsuario()[i] + " RAN: " + dados.getRam().get(i));
+            } else if(dados.getCpu().get(i) > 60) {
+                alertaRAM.add("B - " + dados.getUsuario()[i] + " RAM: " + dados.getRam().get(i));
+            } else if(dados.getCpu().get(i) > 50) {
+                alertaRAM.add("C - " + dados.getUsuario()[i] + " RAM: " + dados.getRam().get(i));
             }
         }
     }
 
-    //Tratamento de RAM
-    public void alertasRAM(){
-        for (Integer i = 0; i < ram.toArray().length; i++) {
-            String modelo = marcapasso.getModelos()[i];
-
-            if (ram.get(i) >= 30) {
-                System.out.println("Uso alto de RAM!!! No modelo: " + modelo);
+    public void filtrarDisco() {
+        ColetaDeDados dados = new ColetaDeDados();
+        for (int i = 0; i < dados.getDisco().toArray().length; i++) {
+            if (dados.getDisco().get(i) > 70) {
+                alertaDisco.add("A - " + dados.getUsuario()[i] + " Disco: " + dados.getDisco().get(i));
+            } else if(dados.getCpu().get(i) > 60) {
+                alertaDisco.add("B - " + dados.getUsuario()[i] + " Disco: " + dados.getDisco().get(i));
+            } else if(dados.getCpu().get(i) > 50) {
+                alertaDisco.add("C - " + dados.getUsuario()[i] + " Disco: " + dados.getDisco().get(i));
             }
         }
     }
 
-    //Tratamento de Disco
-    public void alertasDisco(){
-        for (Integer i = 0; i < disco.toArray().length; i++) {
-            String modelo = marcapasso.getModelos()[i];
+    public void ordernarAlertas() {
+        ColetaDeDados dados = new ColetaDeDados();
+        Collections.sort(alertaCPU);
+        Collections.sort(alertaRAM);
+        Collections.sort(alertaDisco);
+        String[] nomes = dados.getUsuario();
+        int indiceMaiorCPU;
+        int indiceMaiorRAM;
+        int indiceMaiorDisco;
 
-            if (disco.get(i) >= 60) {
-                System.out.println("Disco em 60%! No modelo: " + modelo);
-            } else if (disco.indexOf(i) >= 80) {
-                System.out.println("Disco em 80%, risco de perda de dados!!! No modelo: " + modelo);
+        for(int i = 0; i < dados.getCpu().toArray().length -1; i++){
+            indiceMaiorCPU = i;
+
+            //Diferente do outro que troca, este vê qual é menor e coloca em uma variável que será
+            //Atribuída ao vetor apenas no final
+            for(int j = i+1; j < dados.getCpu().toArray().length; j++){
+                if(dados.getCpu().get(j) > dados.getCpu().get(indiceMaiorCPU)){
+                    indiceMaiorCPU = j;
+                }
+            }
+            //Troca vetor na posição i com vetor na posição indiceMenor
+            if(i != indiceMaiorCPU){
+                alertaCritico.add("Usuário: " + dados.getUsuario()[indiceMaiorCPU] + "CPU: " + dados.getCpu().get(indiceMaiorCPU));
+            }
+        }
+        for(int i = 0; i < dados.getRam().toArray().length -1; i++){
+            indiceMaiorRAM = i;
+
+            //Diferente do outro que troca, este vê qual é menor e coloca em uma variável que será
+            //Atribuída ao vetor apenas no final
+            for(int j = i+1; j < dados.getRam().toArray().length; j++){
+                if(dados.getRam().get(j) > dados.getRam().get(indiceMaiorRAM)){
+                    indiceMaiorRAM = j;
+                }
+            }
+            //Troca vetor na posição i com vetor na posição indiceMenor
+            if(i != indiceMaiorRAM){
+                alertaCritico.add("Usuário: " + dados.getUsuario()[indiceMaiorRAM] + "CPU: " + dados.getRam().get(indiceMaiorRAM));
+            }
+        }
+        for(int i = 0; i < dados.getDisco().toArray().length -1; i++){
+            indiceMaiorDisco = i;
+
+            //Diferente do outro que troca, este vê qual é menor e coloca em uma variável que será
+            //Atribuída ao vetor apenas no final
+            for(int j = i+1; j < dados.getDisco().toArray().length; j++){
+                if(dados.getDisco().get(j) > dados.getDisco().get(indiceMaiorDisco)){
+                    indiceMaiorDisco = j;
+                }
+            }
+            //Troca vetor na posição i com vetor na posição indiceMenor
+            if(i != indiceMaiorDisco){
+                alertaCritico.add("Usuário: " + dados.getUsuario()[indiceMaiorDisco] + "CPU: " + dados.getCpu().get(indiceMaiorDisco));
             }
         }
     }

@@ -3,18 +3,20 @@ package syncheart.sptech;
 import java.util.ArrayList;
 
 public class ColetaDeDados {
-    //Atributos
     private ArrayList<Double> cpu;
     private ArrayList<Double> ram;
     private ArrayList<Double> disco;
+    private String[] usuario;
 
-    //Métodos Setter no Construtor diretamente
+    //Construtor
     public ColetaDeDados() {
-        this.cpu = capturaCpu();
-        this.ram = capturaRam();
-        this.disco = capturaDisco();
+        this.usuario = setUsuario();
+        this.cpu = setCpu();
+        this.ram = setRam();
+        this.disco = setDisco();
     }
 
+    //Getter
     public ArrayList<Double> getCpu() {
         return cpu;
     }
@@ -24,36 +26,42 @@ public class ColetaDeDados {
     public ArrayList<Double> getDisco() {
         return disco;
     }
-
-    //Métodos de Geração de Dados
-    public ArrayList<Double> capturaCpu(){
-        Marcapasso marcapasso = new Marcapasso();
-        Integer totalModelos = marcapasso.getModelos().length;
-        ArrayList<Double> cpu = new ArrayList<>();
-
-        for(Integer i = 0; i < totalModelos; i++){
-            cpu.add((double)((int)(Math.random() * 30)+1));
-        }
-        return cpu;
+    public String[] getUsuario() {
+        return usuario;
     }
-    public ArrayList<Double> capturaRam(){
-        Marcapasso marcapasso = new Marcapasso();
-        Integer totalModelos = marcapasso.getModelos().length;
-        ArrayList<Double> ram = new ArrayList<>();
 
-        for(Integer i = 0; i < totalModelos; i++){
-            ram.add((double)((int)(Math.random() * 50)+1));
+    //Métodos de Números Aleatórios
+    public ArrayList<Double> setCpu(){
+        ArrayList<Double> cpuPreenchimento = new ArrayList<>();
+        for(int i = 0; i < usuario.length; i++){
+            Double numeroAleatorio = (double)((int)(Math.random()*100));
+            cpuPreenchimento.add(numeroAleatorio);
         }
-        return ram;
+        return cpuPreenchimento;
     }
-    public ArrayList<Double> capturaDisco(){
-        Marcapasso marcapasso = new Marcapasso();
-        Integer totalModelos = marcapasso.getModelos().length;
-        ArrayList<Double> disco = new ArrayList<>();
 
-        for(Integer i = 0; i < totalModelos; i++){
-            disco.add((double)((int)(Math.random() * 70)+1));
+    public ArrayList<Double> setRam(){
+        ArrayList<Double> ramPreenchimento = new ArrayList<>();
+        for(int i = 0; i < usuario.length; i++){
+            Double numeroAleatorio = (double)((int)(Math.random()*100));
+            ramPreenchimento.add(numeroAleatorio);
         }
-        return disco;
+        return ramPreenchimento;
+    }
+
+    public ArrayList<Double> setDisco(){
+        ArrayList<Double> discoPreenchimento = new ArrayList<>();
+        for(int i = 0; i < usuario.length; i++){
+            Double numeroAleatorio = (double)((int)(Math.random()*100));
+            discoPreenchimento.add(numeroAleatorio);
+        }
+        return discoPreenchimento;
+    }
+
+    public String[] setUsuario(){
+        String[] usuarios = {"Guilherme Silva","Matheus Nascimento",
+        "Sérgio Vinícius","Guilherme Barros","Gabriel Castilho","Carlos José","Ana Maria",
+        "João Pedro","Miguel Pinto","Carla Peres","Bianca Lopes","Fernando Brandinho"};
+        return usuarios;
     }
 }
