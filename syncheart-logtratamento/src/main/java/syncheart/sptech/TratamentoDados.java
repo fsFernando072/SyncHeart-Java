@@ -80,54 +80,39 @@ public class TratamentoDados {
         Collections.sort(alertaRAM);
         Collections.sort(alertaDisco);
         String[] nomes = dados.getUsuario();
-        int indiceMaiorCPU;
-        int indiceMaiorRAM;
-        int indiceMaiorDisco;
+        int indiceMaiorCPU = 0;
+        int indiceMaiorRAM = 0;
+        int indiceMaiorDisco = 0;
 
         for(int i = 0; i < dados.getCpu().toArray().length -1; i++){
             indiceMaiorCPU = i;
 
-            //Diferente do outro que troca, este vê qual é menor e coloca em uma variável que será
-            //Atribuída ao vetor apenas no final
             for(int j = i+1; j < dados.getCpu().toArray().length; j++){
                 if(dados.getCpu().get(j) > dados.getCpu().get(indiceMaiorCPU)){
                     indiceMaiorCPU = j;
                 }
             }
-            //Troca vetor na posição i com vetor na posição indiceMenor
-            if(i != indiceMaiorCPU){
-                alertaCritico.add("Usuário: " + dados.getUsuario()[indiceMaiorCPU] + "CPU: " + dados.getCpu().get(indiceMaiorCPU));
-            }
         }
         for(int i = 0; i < dados.getRam().toArray().length -1; i++){
             indiceMaiorRAM = i;
 
-            //Diferente do outro que troca, este vê qual é menor e coloca em uma variável que será
-            //Atribuída ao vetor apenas no final
             for(int j = i+1; j < dados.getRam().toArray().length; j++){
                 if(dados.getRam().get(j) > dados.getRam().get(indiceMaiorRAM)){
                     indiceMaiorRAM = j;
                 }
             }
-            //Troca vetor na posição i com vetor na posição indiceMenor
-            if(i != indiceMaiorRAM){
-                alertaCritico.add("Usuário: " + dados.getUsuario()[indiceMaiorRAM] + "CPU: " + dados.getRam().get(indiceMaiorRAM));
-            }
         }
         for(int i = 0; i < dados.getDisco().toArray().length -1; i++){
             indiceMaiorDisco = i;
 
-            //Diferente do outro que troca, este vê qual é menor e coloca em uma variável que será
-            //Atribuída ao vetor apenas no final
             for(int j = i+1; j < dados.getDisco().toArray().length; j++){
                 if(dados.getDisco().get(j) > dados.getDisco().get(indiceMaiorDisco)){
                     indiceMaiorDisco = j;
                 }
             }
-            //Troca vetor na posição i com vetor na posição indiceMenor
-            if(i != indiceMaiorDisco){
-                alertaCritico.add("Usuário: " + dados.getUsuario()[indiceMaiorDisco] + "CPU: " + dados.getCpu().get(indiceMaiorDisco));
-            }
         }
+        alertaCritico.add("Usuário: " + dados.getUsuario()[indiceMaiorCPU] + " - CPU: " + dados.getCpu().get(indiceMaiorCPU));
+        alertaCritico.add("Usuário: " + dados.getUsuario()[indiceMaiorRAM] + " - RAM: " + dados.getRam().get(indiceMaiorRAM));
+        alertaCritico.add("Usuário: " + dados.getUsuario()[indiceMaiorDisco] + " - Disco: " + dados.getCpu().get(indiceMaiorDisco));
     }
 }

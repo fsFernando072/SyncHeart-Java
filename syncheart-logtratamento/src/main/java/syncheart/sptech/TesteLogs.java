@@ -1,6 +1,5 @@
 package syncheart.sptech;
 
-import jdk.swing.interop.SwingInterOpUtils;
 
 import java.util.Scanner;
 
@@ -11,7 +10,10 @@ public class TesteLogs {
         Boolean sair = false;
         TratamentoDados tratamento = new TratamentoDados();
         while (!sair) {
-            System.out.println("Escolha uma opção abaixo:");
+            System.out.println("Escolha uma opção abaixo: \n1) Ver todos os alertas " +
+                    "\n2) Ver alertas por grau de criticidade " +
+                    "\n3) Ver apenas alertas críticos" +
+                    "\n4) Sair");
             int opcao = leitor.nextInt();
 
             if (opcao == 1) {
@@ -20,7 +22,7 @@ public class TesteLogs {
                 System.out.println(tratamento.getAlertaDisco());
             }
             else if (opcao == 2) {
-                System.out.println("Escolha uma opção abaixo:");
+                System.out.println("Escolha uma opção abaixo: \nAlertas de grau A \nAlertas de grau B \nAlertas de grau C");
                 String grauEscolhido = leitorString.nextLine();
                 String escolhaFormatada = grauEscolhido.toUpperCase();
                 if (escolhaFormatada.equals("A")) {
