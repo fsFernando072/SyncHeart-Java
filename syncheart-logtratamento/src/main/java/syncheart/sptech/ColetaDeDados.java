@@ -61,7 +61,7 @@ public class ColetaDeDados {
     public String[] setUsuario(){
         String[] usuarios = {"Guilherme Silva","Matheus Nascimento",
         "Sérgio Vinícius","Guilherme Barros","Gabriel Castilho","Carlos José","Ana Maria",
-        "João Pedro","Miguel Pinto","Carla Peres","Bianca Lopes","Fernando Brandinho"};
+        "João Pedro","Carla Peres","Bianca Lopes"};
         return usuarios;
     }
 }

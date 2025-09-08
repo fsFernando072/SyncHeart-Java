@@ -40,11 +40,11 @@ public class TratamentoDados {
         ColetaDeDados dados = new ColetaDeDados();
         for (int i = 0; i < dados.getCpu().toArray().length; i++) {
             if (dados.getCpu().get(i) > 40) {
-                alertaCPU.add("A - " + dados.getUsuario()[i] + " CPU: " + dados.getCpu().get(i));
+                alertaCPU.add("A - " + dados.getUsuario()[i] + " -- CPU: " + dados.getCpu().get(i));
             } else if(dados.getCpu().get(i) > 30) {
-                alertaCPU.add("B - " + dados.getUsuario()[i] + " CPU: " + dados.getCpu().get(i));
+                alertaCPU.add("B - " + dados.getUsuario()[i] + " -- CPU: " + dados.getCpu().get(i));
             } else if(dados.getCpu().get(i) > 20) {
-                alertaCPU.add("C - " + dados.getUsuario()[i] + " CPU: " + dados.getCpu().get(i));
+                alertaCPU.add("C - " + dados.getUsuario()[i] + " -- CPU: " + dados.getCpu().get(i));
             }
         }
     }
@@ -52,11 +52,11 @@ public class TratamentoDados {
         ColetaDeDados dados = new ColetaDeDados();
         for (int i = 0; i < dados.getRam().toArray().length; i++) {
             if (dados.getRam().get(i) > 70) {
-                alertaRAM.add("A - " + dados.getUsuario()[i] + " RAN: " + dados.getRam().get(i));
+                alertaRAM.add("A - " + dados.getUsuario()[i] + " -- RAM: " + dados.getRam().get(i));
             } else if(dados.getCpu().get(i) > 60) {
-                alertaRAM.add("B - " + dados.getUsuario()[i] + " RAM: " + dados.getRam().get(i));
+                alertaRAM.add("B - " + dados.getUsuario()[i] + " -- RAM: " + dados.getRam().get(i));
             } else if(dados.getCpu().get(i) > 50) {
-                alertaRAM.add("C - " + dados.getUsuario()[i] + " RAM: " + dados.getRam().get(i));
+                alertaRAM.add("C - " + dados.getUsuario()[i] + " -- RAM: " + dados.getRam().get(i));
             }
         }
     }
@@ -65,11 +65,11 @@ public class TratamentoDados {
         ColetaDeDados dados = new ColetaDeDados();
         for (int i = 0; i < dados.getDisco().toArray().length; i++) {
             if (dados.getDisco().get(i) > 70) {
-                alertaDisco.add("A - " + dados.getUsuario()[i] + " Disco: " + dados.getDisco().get(i));
+                alertaDisco.add("A - " + dados.getUsuario()[i] + " -- Disco: " + dados.getDisco().get(i));
             } else if(dados.getCpu().get(i) > 60) {
-                alertaDisco.add("B - " + dados.getUsuario()[i] + " Disco: " + dados.getDisco().get(i));
+                alertaDisco.add("B - " + dados.getUsuario()[i] + " -- Disco: " + dados.getDisco().get(i));
             } else if(dados.getCpu().get(i) > 50) {
-                alertaDisco.add("C - " + dados.getUsuario()[i] + " Disco: " + dados.getDisco().get(i));
+                alertaDisco.add("C - " + dados.getUsuario()[i] + " -- Disco: " + dados.getDisco().get(i));
             }
         }
     }
