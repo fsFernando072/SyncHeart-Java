@@ -1,5 +1,5 @@
 services:
-  web:
+  java:
     build:
       context: .
       dockerfile: Dockerfile
