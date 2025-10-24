@@ -6,7 +6,7 @@ COPY pom.xml /app
 WORKDIR /app
 RUN mvn clean package
 
-FROM amazoncorretto:17-jre-alpine
+FROM amazoncorretto:17-alpine
 COPY --from=build /app/target/etl-v1-1.0-SNAPSHOT.jar /app/app.jar
 
 WORKDIR /app
