@@ -5,6 +5,5 @@ services:
       dockerfile: Dockerfile
     image: fsfernando072/syncheart-java:latest
     container_name: syncheart_java
-    restart: always
     ports:
       - "8080:8080"
