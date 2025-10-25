@@ -16,6 +16,11 @@ package school.sptech;
 
 
 // Importando as dependências necessárias
+import com.atlassian.jira.rest.client.api.JiraRestClient;
+import com.atlassian.jira.rest.client.api.JiraRestClientFactory;
+import com.atlassian.jira.rest.client.api.domain.input.IssueInput;
+import com.atlassian.jira.rest.client.api.domain.input.IssueInputBuilder;
+import io.github.cdimascio.dotenv.Dotenv;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.core.BeanPropertyRowMapper;
 import software.amazon.awssdk.regions.Region;
@@ -25,12 +30,22 @@ import software.amazon.awssdk.transfer.s3.S3TransferManager;
 import software.amazon.awssdk.transfer.s3.model.*;
 
 import java.io.*;
+import java.net.URI;
+import java.net.URISyntaxException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
+
+import com.atlassian.jira.rest.client.api.JiraRestClient;
+import com.atlassian.jira.rest.client.api.JiraRestClientFactory;
+import com.atlassian.jira.rest.client.api.domain.input.IssueInput;
+import com.atlassian.jira.rest.client.api.domain.input.IssueInputBuilder;
+import com.atlassian.jira.rest.client.internal.async.AsynchronousJiraRestClientFactory;
+
+
 
 
 
@@ -44,7 +59,7 @@ public class Main {
         tratarDadosRaw();
         enviarArquivos(s3Client, 2, "arquivos_tratados");
 
-       baixarArquivos(s3Client, 2, "arquivos1");
+        baixarArquivos(s3Client, 2, "arquivos1");
         tratamentoClient();
         enviarArquivos(s3Client, 0, "arquivos_tratados1");
 
@@ -257,39 +272,23 @@ public class Main {
                                 WHERE mp.modelo_id = (SELECT modelo_id FROM Dispositivos WHERE dispositivo_uuid LIKE ?)
                                 """, new BeanPropertyRowMapper<>(Parametro.class),  "%" + log.getId() + "%");
 
+
                         for (Parametro parametro : listaParametros) {
                             if (parametro.getMetrica().equals("CPU") && log.getCpu() >= parametro.getLimiarValor()) {
-                                String sqlInsert = """
-                                        INSERT INTO Alertas (dispositivo_id, tipo_alerta, mensagem, detectado_em)
-                                                      values((SELECT dispositivo_id FROM Dispositivos WHERE dispositivo_uuid LIKE ?), ?, ?, ?)
-                                        """;
-
-                                template.update(sqlInsert, log.getId(), "CPU", "CPU excedeu o limite", LocalDate.now());
-
+                                salvarHistorico(template, log, "CPU", "CPU excedeu o limite");
+                                enviarAlertas("CPU excedeu o limite");
                             }
                             else if (parametro.getMetrica().equals("RAM") && log.getRam() >= parametro.getLimiarValor()) {
-                                String sqlInsert = """
-                                        INSERT INTO Alertas (dispositivo_id, tipo_alerta, mensagem, detectado_em)
-                                                      values((SELECT dispositivo_id FROM Dispositivos WHERE dispositivo_uuid LIKE ?), ?, ?, ?)
-                                        """;
-
-                                template.update(sqlInsert, log.getId(), "RAM", "RAM excedeu o limite", LocalDate.now());
+                                salvarHistorico(template, log, "RAM", "RAM excedeu o limite");
+                                enviarAlertas("RAM excedeu o limite");
                             }
                             else if (parametro.getMetrica().equals("Bateria") && log.getBateria() <= parametro.getLimiarValor()) {
-                                String sqlInsert = """
-                                        INSERT INTO Alertas (dispositivo_id, tipo_alerta, mensagem, detectado_em)
-                                                      values((SELECT dispositivo_id FROM Dispositivos WHERE dispositivo_uuid LIKE ?), ?, ?, ?)
-                                        """;
-
-                                template.update(sqlInsert, log.getId(), "Bateria", "Bateria baixa", LocalDate.now());
+                                salvarHistorico(template, log, "Bateria", "Bateria fraca");
+                                enviarAlertas("Bateria fraca");
                             }
                             else if (parametro.getMetrica().equals("Disco") && log.getDisco() >= parametro.getLimiarValor()) {
-                                String sqlInsert = """
-                                        INSERT INTO Alertas (dispositivo_id, tipo_alerta, mensagem, detectado_em)
-                                                      values((SELECT dispositivo_id FROM Dispositivos WHERE dispositivo_uuid LIKE ?), ?, ?, ?)
-                                        """;
-
-                                template.update(sqlInsert, log.getId(), "Disco", "Disco excedeu o limite", LocalDate.now());
+                                salvarHistorico(template, log, "Disco", "Disco excedeu o limite");
+                                enviarAlertas("Disco excedeu o limite");
                             }
                         }
 
@@ -396,6 +395,40 @@ public class Main {
         System.out.println("Envio de arquivos concluído com sucesso");
         removerPasta(nomePasta);
 
+    }
+
+    public static void enviarAlertas(String descricao) {
+        try {
+            JiraRestClientFactory factory = new AsynchronousJiraRestClientFactory();
+            Dotenv dotenv = Dotenv.load();
+            String tokenJira = dotenv.get("JIRA_API_TOKEN");
+
+            URI jiraServerUri = new URI("https://sptech-team-tll0v8wj.atlassian.net");
+            try (JiraRestClient restClient = factory.createWithBasicHttpAuthentication(jiraServerUri, "davi.ssilva@sptech.school", tokenJira)) {
+
+                IssueInputBuilder issueBuilder = new IssueInputBuilder("AAC", 10036L);
+                issueBuilder.setSummary("Alerta detectado");
+                issueBuilder.setDescription("Descrição da tarefa: {" + descricao + "}");
+                IssueInput issueInput = issueBuilder.build();
+
+                restClient.getIssueClient().createIssue(issueInput).claim();
+            }
+        }
+        catch (URISyntaxException erro) {
+            erro.printStackTrace();
+        }
+        catch (IOException erro) {
+            erro.printStackTrace();
+        }
+    }
+
+    public static void salvarHistorico(JdbcTemplate template, Log log, String componente, String mensagem) {
+        String sqlInsert = """
+                                        INSERT INTO Alertas (dispositivo_id, tipo_alerta, mensagem, detectado_em)
+                                                      values((SELECT dispositivo_id FROM Dispositivos WHERE dispositivo_uuid LIKE ?), ?, ?, ?)
+                                        """;
+
+        template.update(sqlInsert, log.getId(), componente, mensagem, LocalDate.now());
     }
 
 }
