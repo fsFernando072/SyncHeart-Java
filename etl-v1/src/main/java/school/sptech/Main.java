@@ -29,6 +29,7 @@ import software.amazon.awssdk.services.s3.model.*;
 import software.amazon.awssdk.transfer.s3.S3TransferManager;
 import software.amazon.awssdk.transfer.s3.model.*;
 
+
 import java.io.*;
 import java.net.URI;
 import java.net.URISyntaxException;
@@ -38,6 +39,7 @@ import java.nio.file.Paths;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.CompletableFuture;
 
 import com.atlassian.jira.rest.client.api.JiraRestClient;
 import com.atlassian.jira.rest.client.api.JiraRestClientFactory;
@@ -59,9 +61,9 @@ public class Main {
         tratarDadosRaw();
         enviarArquivos(s3Client, 2, "arquivos_tratados");
 
-        baixarArquivos(s3Client, 2, "arquivos1");
-        tratamentoClient();
-        enviarArquivos(s3Client, 0, "arquivos_tratados1");
+//        baixarArquivos(s3Client, 2, "arquivos1");
+//        tratamentoClient();
+//        enviarArquivos(s3Client, 0, "arquivos_tratados1");
 
     }
 
@@ -75,7 +77,6 @@ public class Main {
             List<Bucket> bucketList = response.buckets();
             ListObjectsV2Request req = ListObjectsV2Request.builder().bucket(bucketList.get(indiceBucket).name()).build();
             ListObjectsV2Response res = s3Client.listObjectsV2(req);
-
 
             // Cria um diretório localmente chamado "arquivos". O diretório irá guardar os arquivos baixados.
             Path pasta = Paths.get(nomePasta);
@@ -119,6 +120,9 @@ public class Main {
     public static void tratarDadosRaw() {
         System.out.println("Iniciando tratamento dos dados...");
 
+        DatabaseConfiguration databaseConfiguration = new DatabaseConfiguration();
+        JdbcTemplate template = new JdbcTemplate(databaseConfiguration.getDataSource());
+
         File pasta = new File("arquivos");
         File[] arquivos = pasta.listFiles();
 
@@ -135,15 +139,13 @@ public class Main {
 
         // Lista todos os arquivos na pasta arquivos e os modifica, enviando a nova versão para o diretório arquivos_tratados
         // Remove o diretório arquivos no final
+        List<Clinica> clinicas = new ArrayList<>();
         if (arquivos != null) {
             for (File arquivo : arquivos) {
                 try {
                     FileInputStream inputStream = new FileInputStream("arquivos/" + arquivo.getName());
                     BufferedReader reader = new BufferedReader(new InputStreamReader(inputStream));
-                    OutputStream outputStream = new FileOutputStream("arquivos_tratados/" + arquivo.getName());
-                    BufferedWriter writer = new BufferedWriter(new OutputStreamWriter(outputStream));
                     String line;
-                    List<Log> logs = new ArrayList<>();
 
                     // Ignora a primeira linha do arquivo (ou seja, o header)
                     reader.readLine();
@@ -163,28 +165,39 @@ public class Main {
                         String listaTarefas = dados[8];
 
                         Log log = new Log(timestamp, id, arritmia, cpu, ram, disco, bateria, tarefas, listaTarefas);
-                        logs.add(log);
-                    }
 
-                    // Formata os dados e escreve em um novo arquivo
-                    try {
-                        writer.append("TIMESTAMP;UUID;ARRITMIA;CPU;RAM;DISCO;BATERIA;QTD_TAREFAS;TAREFAS\n");
 
-                        for (Log log : logs) {
-                            writer.write(String.format("%s;%s;%b;%.1f;%.1f;%.1f;%.1f;%d;%s\n", log.getTimestamp(),
-                                    log.getId(), log.getArritmia(), log.getCpu(), log.getRam(), log.getDisco(), log.getBateria(),
-                                    log.getTarefas(), log.getListaTarefas()).replace(",", "."));
+                        Clinica c = template.queryForObject(
+                                """
+                                SELECT clinica_id as id, nome_fantasia as nome FROM Clinicas
+                                WHERE clinica_id = (SELECT clinica_id FROM EquipesCuidado WHERE equipe_id = (SELECT
+                                equipe_id FROM Dispositivos WHERE dispositivo_uuid = ?))
+                                """, new BeanPropertyRowMapper<>(Clinica.class), log.getId()
+                        );
+
+                        Boolean repete = false;
+                        for (Clinica clinica : clinicas) {
+                            if (c.getNome().equals(clinica.getNome())) {
+                                repete = true;
+
+                                c = clinica;
+                                break;
+                            }
+                        }
+
+                        c.getListaLogs().add(log);
+
+                        if (!repete) {
+                            clinicas.add(c);
                         }
                     }
-                    catch (IOException erro) {
-                        System.out.println("Erro ao escrever o arquivo");
-                        erro.printStackTrace();
-                    }
-                    finally {
+
+
+
+                    // Formata os dados e escreve em um novo arquivo
+
                         try {
-                            writer.close();
                             reader.close();
-                            outputStream.close();
                             inputStream.close();
                         }
                         catch (IOException erro) {
@@ -192,9 +205,6 @@ public class Main {
                             erro.printStackTrace();
                             System.exit(1);
                         }
-                    }
-
-
 
                 }
                 catch (IOException erro) {
@@ -203,6 +213,12 @@ public class Main {
                     System.exit(1);
                 }
             }
+
+            for (Clinica c : clinicas) {
+                criarPastasClinicas(c, "arquivos_tratados/");
+            }
+
+
         }
         else {
             System.out.println("Diretório não encontrado.");
@@ -217,6 +233,9 @@ public class Main {
     // Função para o tratamento final dos dados
     public static void tratamentoClient() {
         System.out.println("Iniciando tratamento final dos dados...");
+
+        DatabaseConfiguration databaseConfiguration = new DatabaseConfiguration();
+        JdbcTemplate template = new JdbcTemplate(databaseConfiguration.getDataSource());
 
         File pasta = new File("arquivos1");
         File[] arquivos = pasta.listFiles();
@@ -264,8 +283,6 @@ public class Main {
                         Log log = new Log(timestamp, id, arritmia, cpu, ram, disco, bateria, tarefas, listaTarefas);
                         logs.add(log);
 
-                        DatabaseConfiguration databaseConfiguration = new DatabaseConfiguration();
-                        JdbcTemplate template = new JdbcTemplate(databaseConfiguration.getDataSource());
 
                         List<Parametro> listaParametros = template.query("""
                                 SELECT metrica, condicao, limiar_valor from ModelosAlertaParametros mp
@@ -352,6 +369,15 @@ public class Main {
 
         if (arquivos != null) {
             for (File arquivo : arquivos) {
+                if (arquivo.isDirectory()) {
+                    File[] arquivosCsv = arquivo.listFiles();
+                    if (arquivosCsv != null) {
+                        for (File csv : arquivosCsv) {
+                            csv.delete();
+                        }
+                    }
+                }
+
                 arquivo.delete();
             }
         }
@@ -359,6 +385,57 @@ public class Main {
         pasta.delete();
 
         System.out.println("Diretório excluído com sucesso");
+    }
+
+    public static void criarPastasClinicas(Clinica c, String caminhoPasta) {
+        String caminhoCompleto = caminhoPasta + c.getNome();
+        if (Files.notExists(Paths.get(caminhoCompleto))) {
+            try {
+                Files.createDirectories(Paths.get(caminhoCompleto));
+            }
+            catch (IOException erro) {
+                System.out.println("Erro ao criar a pasta");
+                erro.printStackTrace();
+            }
+        }
+
+        juntarArquivos(c, caminhoCompleto);
+    }
+
+    public static void juntarArquivos(Clinica c, String caminhoCompleto) {
+        try {
+            OutputStream outputStream = new FileOutputStream(caminhoCompleto + "/" + c.getListaLogs().getFirst().getTimestamp());
+            BufferedWriter writer = new BufferedWriter(new OutputStreamWriter(outputStream));
+
+            try {
+                writer.append("TIMESTAMP;UUID;ARRITMIA;CPU;RAM;DISCO;BATERIA;QTD_TAREFAS;TAREFAS\n");
+
+                        for (Log log : c.getListaLogs()) {
+                            writer.write(String.format("%s;%s;%b;%.1f;%.1f;%.1f;%.1f;%d;%s\n", log.getTimestamp(),
+                                    log.getId(), log.getArritmia(), log.getCpu(), log.getRam(), log.getDisco(), log.getBateria(),
+                                    log.getTarefas(), log.getListaTarefas()).replace(",", "."));
+                        }
+            }
+            catch (IOException erro) {
+                System.out.println("Erro ao escrever o arquivo");
+                erro.printStackTrace();
+            }
+            finally {
+                try {
+                    writer.close();
+                    outputStream.close();
+                }
+                catch (IOException erro) {
+                    System.out.println("Erro ao fechar o arquivo");
+                    erro.printStackTrace();
+                    System.exit(1);
+                }
+            }
+        } catch (FileNotFoundException erro) {
+            System.out.println("Diretório não encontrado");
+            erro.printStackTrace();
+        }
+
     }
 
     // Função para enviar os arquivos para um bucket
@@ -376,14 +453,42 @@ public class Main {
         // Seleciona os arquivos na lista e envia para o bucket trusted
         if (arquivos != null) {
             for (File arquivo : arquivos) {
-                UploadFileRequest uploadFileRequest = UploadFileRequest.builder()
-                        .putObjectRequest(b -> b.bucket(bucketList.get(indiceBucket).name()).key(arquivo.getName()))
-                        .source(Paths.get(nomePasta + "/" + arquivo.getName()))
-                        .build();
+                if (arquivo.isDirectory()) {
+                    UploadDirectoryRequest uploadDirectoryRequest = UploadDirectoryRequest.builder()
+                            .source(Paths.get(nomePasta, arquivo.getName()))
+                            .bucket(bucketList.get(indiceBucket).name())
+                            .s3Prefix(arquivo.getName())
+                            .build();
 
-                FileUpload fileUpload = transferManager.uploadFile(uploadFileRequest);
+                    DirectoryUpload directoryUpload = transferManager.uploadDirectory(uploadDirectoryRequest);
+                    CompletableFuture<CompletedDirectoryUpload> future = directoryUpload.completionFuture();
+                    future.join();
 
-                fileUpload.completionFuture().join();
+                    File diretorio = new File(arquivo.getName());
+                    File[] arquivosCsv = diretorio.listFiles();
+
+                    if (arquivosCsv != null) {
+                        for (File csv : arquivosCsv) {
+                            UploadFileRequest uploadFileRequest = UploadFileRequest.builder()
+                                    .putObjectRequest(b -> b.bucket(bucketList.get(indiceBucket).name()).key(arquivo.getName() + "/" + csv.getName()))
+                                    .source(Paths.get(nomePasta + "/" + arquivo.getName() + "/" + csv.getName()))
+                                    .build();
+
+                            FileUpload fileUpload = transferManager.uploadFile(uploadFileRequest);
+
+                            fileUpload.completionFuture().join();
+                        }
+                    }
+                } else {
+                    UploadFileRequest uploadFileRequest = UploadFileRequest.builder()
+                            .putObjectRequest(b -> b.bucket(bucketList.get(indiceBucket).name()).key(arquivo.getName()))
+                            .source(Paths.get(nomePasta + "/" + arquivo.getName()))
+                            .build();
+
+                    FileUpload fileUpload = transferManager.uploadFile(uploadFileRequest);
+
+                    fileUpload.completionFuture().join();
+                }
             }
         }
         else {
