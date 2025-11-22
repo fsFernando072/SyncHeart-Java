@@ -9,66 +9,91 @@ import java.util.List;
 import java.util.Map;
 
 public class ProcessadorHolistica extends ProcessadorBase {
-/*
-    Classe de Processamento da Dashboard Holistica (César)
-*/
-    // Nome fixo do arquivo JSON que o Front-end vai ler
-    private static final String NOME_ARQUIVO_FINAL = "dashboard_holistica.json";
+
+    // Define o nome fixo do arquivo dentro da pasta da clínica
+    private static final String NOME_ARQUIVO_PADRAO = "dashboard_holistica.json";
 
     @Override
-    protected Object processarDados(List<Map<String, String>> dadosBrutos, LambdaLogger logger) {
+    protected Object processarDados(List<Map<String, String>> dadosBrutos, String nomeClinica, LambdaLogger logger) {
 
-        // 1. Gera o DTO com os dados do momento atual (CSV que acabou de chegar)
-        DashboardHolisticaDto dtoAtual = gerarDtoDoLote(dadosBrutos);
-
-        // 2. Tenta ler o JSON histórico que já existe no bucket Client
-        DashboardHolisticaDto dtoAntigo = lerJsonExistente(NOME_ARQUIVO_FINAL, DashboardHolisticaDto.class);
-
-        // 3. Faz o Merge (Mistura o histórico antigo com o novo)
-        if (dtoAntigo != null) {
-            logger.log("Dashboard Holística antiga encontrada. Atualizando histórico...");
-
-            // --- Merge do Histórico (Gráfico de Linha) ---
-            List<String> labelsCombinadas = new ArrayList<>();
-            if (dtoAntigo.historico != null) labelsCombinadas.addAll(dtoAntigo.historico.labels);
-            labelsCombinadas.addAll(dtoAtual.historico.labels);
-
-            List<Integer> valoresCombinados = new ArrayList<>();
-            if (dtoAntigo.historico != null) valoresCombinados.addAll(dtoAntigo.historico.valores);
-            valoresCombinados.addAll(dtoAtual.historico.valores);
-
-            // Mantém apenas os últimos 20 pontos para o gráfico não ficar gigante
-            int maxPontos = 20;
-            int tamanho = labelsCombinadas.size();
-            int inicio = Math.max(0, tamanho - maxPontos);
-
-            dtoAtual.historico.labels = labelsCombinadas.subList(inicio, tamanho);
-            dtoAtual.historico.valores = valoresCombinados.subList(inicio, tamanho);
-
-            // --- Merge de KPIs ---
-
-
-        } else {
-            logger.log("Nenhum histórico encontrado. Criando novo arquivo dashboard_holistica.json.");
+        // Validação de segurança: se o lote vier vazio, aborta.
+        if (dadosBrutos == null || dadosBrutos.isEmpty()) {
+            return null;
         }
 
-        // 4. Salva o arquivo atualizado com o nome fixo
-        salvarJsonFixo(dtoAtual, NOME_ARQUIVO_FINAL, logger);
+        // 1. DEFINIÇÃO DO CAMINHO
+        // O nomeClinica vem automaticamente da pasta do S3 Trusted (processado pela Classe Mãe)
+        // Exemplo de resultado: "Hospital_Sirio/dashboard_holistica.json"
+        String caminhoArquivo = nomeClinica + "/" + NOME_ARQUIVO_PADRAO;
 
-        // Retorna null para avisar a Classe Mãe que já salvamos manualmente
+        logger.log("Iniciando atualização da dashboard para: " + nomeClinica);
+
+        // 2. GERAÇÃO DO DTO
+        // Processa o CSV recebido para calcular o estado atual do sistema
+        DashboardHolisticaDto dtoAtual = gerarDtoDoLote(dadosBrutos);
+
+        // 3. RECUPERAÇÃO DO HISTÓRICO (SE EXISTIR)
+        // Tenta ler o JSON que já existe na pasta específica da clínica
+        DashboardHolisticaDto dtoAntigo = lerJsonExistente(caminhoArquivo, DashboardHolisticaDto.class);
+
+        // 4. LÓGICA DE MERGE (MISTURA ANTIGO + NOVO)
+        if (dtoAntigo != null) {
+            logger.log("Histórico encontrado. Realizando merge de dados...");
+
+            // --- Merge do Gráfico de Histórico ---
+
+            // Prepara lista de Labels (Datas/Horas)
+            List<String> labelsCombinadas = new ArrayList<>();
+            if (dtoAntigo.historico != null && dtoAntigo.historico.labels != null) {
+                labelsCombinadas.addAll(dtoAntigo.historico.labels);
+            }
+            labelsCombinadas.addAll(dtoAtual.historico.labels);
+
+            // Prepara lista de Valores
+            List<Integer> valoresCombinados = new ArrayList<>();
+            if (dtoAntigo.historico != null && dtoAntigo.historico.valores != null) {
+                valoresCombinados.addAll(dtoAntigo.historico.valores);
+            }
+            valoresCombinados.addAll(dtoAtual.historico.valores);
+
+            // Corte: Mantém apenas os últimos 20 pontos para não sobrecarregar o gráfico
+            int maxPontos = 20;
+            int tamanhoTotal = labelsCombinadas.size();
+            int inicioCorte = Math.max(0, tamanhoTotal - maxPontos);
+
+            // Atualiza o DTO Atual com a lista combinada e cortada
+            dtoAtual.historico.labels = labelsCombinadas.subList(inicioCorte, tamanhoTotal);
+            dtoAtual.historico.valores = valoresCombinados.subList(inicioCorte, tamanhoTotal);
+
+            // KPIs, Matriz e Alertas mantêm-se os do "dtoAtual" (estado real-time)
+
+        } else {
+            logger.log("Nenhum histórico anterior encontrado. Criando novo arquivo.");
+        }
+
+        // 5. SALVAMENTO
+        // Salva o arquivo atualizado na pasta correta do bucket Client
+        salvarJsonFixo(dtoAtual, caminhoArquivo, logger);
+
+        // Retorna null para sinalizar à classe mãe que o salvamento já foi feito manualmente
         return null;
     }
 
-    // Método auxiliar para converter o CSV cru no Objeto DTO
+    /*
+     Método auxiliar que converte o CSV Bruto
+      no objeto estruturado DashboardHolisticaDto.
+     */
     private DashboardHolisticaDto gerarDtoDoLote(List<Map<String, String>> dadosBrutos) {
         DashboardHolisticaDto dto = new DashboardHolisticaDto();
 
-        // Listas auxiliares
+        // Listas auxiliares para preencher o DTO
         List<DashboardHolisticaDto.AlertaTriagem> alertas = new ArrayList<>();
         List<DashboardHolisticaDto.MatrizItem> matriz = new ArrayList<>();
         List<Integer> historicoValores = new ArrayList<>();
         List<String> historicoLabels = new ArrayList<>();
+        List<DashboardHolisticaDto.HotspotItem> hotspots = new ArrayList<>();
 
+        // Contadores e Acumuladores
         int countCritico = 0;
         int countAtencao = 0;
         int countSaudavel = 0;
@@ -76,99 +101,117 @@ public class ProcessadorHolistica extends ProcessadorBase {
         double somaCpu = 0;
         double somaRam = 0;
 
-        int idCounter = 1; // Para gerar IDs únicos para a lista de alertas
+        int idCounter = 1; // Contador para gerar IDs sequenciais nos alertas
 
         for (Map<String, String> linha : dadosBrutos) {
             try {
-                // Converte Strings do CSV para números (Tratando virgula e ponto)
+                // Conversão segura de String para Double (trata vírgula e ponto)
                 double cpu = Double.parseDouble(linha.getOrDefault("CPU", "0").replace(",", "."));
                 double ram = Double.parseDouble(linha.getOrDefault("RAM", "0").replace(",", "."));
                 double bateria = Double.parseDouble(linha.getOrDefault("BATERIA", "0").replace(",", "."));
-                String uuid = linha.getOrDefault("UUID", "N/A");
-                String ts = linha.getOrDefault("TIMESTAMP", "");
 
+                String uuid = linha.getOrDefault("UUID", "N/A");
+                String timestamp = linha.getOrDefault("TIMESTAMP", "");
+
+                // Acumula para médias
                 somaCpu += cpu;
                 somaRam += ram;
 
-                // Preenche listas do histórico
+                // Adiciona ao histórico (para o gráfico de linha)
                 historicoValores.add((int) cpu);
-                // Pega só o horário (HH:mm:ss) do timestamp
-                historicoLabels.add(ts.length() > 11 ? ts.substring(11, 19) : ts);
 
-                // #### Vou Remover. Os dados de alerta devem vir do Jira ####
-                // --- Regras de Negócio (Alertas) ---
-                String tipo = null;
-                String texto = null;
-                String metrica = null;
-                String valor = null;
+                // Formata o timestamp para pegar apenas a hora (HH:mm:ss)
+                String labelHora = timestamp.length() > 11 ? timestamp.substring(11, 19) : timestamp;
+                historicoLabels.add(labelHora);
 
-                // Crítico: CPU > 90% ou Bateria < 15%
+                // --- Regras de Negócio (Definição de Status) ---
+                // ************ Vou remover, alertas vão ser definidos no JIRA ************
+                String tipoAlerta = null;
+                String textoAlerta = null;
+                String metricaAlerta = null;
+                String valorAlerta = null;
+
+                // Regra Crítica: CPU acima de 20% OU Bateria abaixo de 15%
                 if (cpu > 90 || bateria < 15) {
-                    tipo = "critico";
-                    texto = cpu > 90 ? "Falha Crítica de CPU" : "Bateria em Nível Crítico";
-                    metrica = cpu > 90 ? "CPU" : "Bateria";
-                    valor = cpu > 90 ? String.format("%.1f%%", cpu) : String.format("%.1f%%", bateria);
+                    tipoAlerta = "critico";
+
+                    if (cpu > 90) {
+                        textoAlerta = "Falha Crítica de CPU";
+                        metricaAlerta = "CPU";
+                        valorAlerta = String.format("%.1f%%", cpu);
+                    } else {
+                        textoAlerta = "Bateria em Nível Crítico";
+                        metricaAlerta = "Bateria";
+                        valorAlerta = String.format("%.1f%%", bateria);
+                    }
                     countCritico++;
                 }
-                // Atenção: RAM > 80%
+                // Regra Atenção: RAM acima de 80%
                 else if (ram > 80) {
-                    tipo = "atencao";
-                    texto = "Alta Demanda de Memória";
-                    metrica = "RAM";
-                    valor = String.format("%.1f%%", ram);
+                    tipoAlerta = "atencao";
+                    textoAlerta = "Alta Demanda de Memória";
+                    metricaAlerta = "RAM";
+                    valorAlerta = String.format("%.1f%%", ram);
                     countAtencao++;
-                } else {
+                }
+                // Saudável
+                else {
                     countSaudavel++;
                 }
 
-                // Adiciona na fila de triagem (Limitado a 20 para não poluir)
-                if (tipo != null && alertas.size() < 20) {
+                // Se houver alerta, adiciona à lista (limitado a 10 para não poluir o JSON)
+                if (tipoAlerta != null && alertas.size() < 10) {
                     alertas.add(new DashboardHolisticaDto.AlertaTriagem(
                             idCounter++,
-                            1, // ID Modelo fictício
+                            1, // ID Modelo (pode ser dinâmico se vier no CSV)
                             uuid,
-                            tipo,
-                            texto,
-                            "Agora",
-                            metrica,
-                            valor
+                            tipoAlerta,
+                            textoAlerta,
+                            "Agora", // Tempo relativo
+                            metricaAlerta,
+                            valorAlerta
                     ));
                 }
 
-            } catch (Exception e) {
-                // Ignora linhas com erro de conversão
-                continue;
+            } catch (NumberFormatException e) {
+
             }
         }
 
-        // --- Cálculos Finais e Preenchimento do DTO ---
-        int total = dadosBrutos.size();
-        double mediaCpu = total > 0 ? somaCpu / total : 0;
-        double mediaRam = total > 0 ? somaRam / total : 0;
+        // --- Cálculos Finais ---
+        int totalRegistros = dadosBrutos.size();
+        double mediaCpu = totalRegistros > 0 ? somaCpu / totalRegistros : 0;
+        double mediaRam = totalRegistros > 0 ? somaRam / totalRegistros : 0;
 
-        // 1. KPIs
-        dto.kpis = new DashboardHolisticaDto.Kpis(total, countAtencao, countCritico);
+        // 1. Preenchimento de KPIs
+        dto.kpis = new DashboardHolisticaDto.Kpis(totalRegistros, countAtencao, countCritico);
 
-        // 2. Fila de Triagem
+        // 2. Fila de Triagem (Lista de Alertas)
         dto.filaTriagem = alertas;
 
-        // 3. Histórico (Momentâneo)
+        // 3. Histórico (Inicialmente com os dados do lote atual)
         dto.historico = new DashboardHolisticaDto.Historico(historicoLabels, historicoValores);
 
         // 4. Matriz de Stress (Simulação baseada na média do lote)
+        // Assume valores de 0 a 100 para posicionamento na matriz
         matriz.add(new DashboardHolisticaDto.MatrizItem(1, "Média Geral", (int) mediaCpu));
         matriz.add(new DashboardHolisticaDto.MatrizItem(2, "Média Geral", (int) mediaRam));
-        matriz.add(new DashboardHolisticaDto.MatrizItem(3, "Média Geral", 50)); // Disco fixo
+        matriz.add(new DashboardHolisticaDto.MatrizItem(3, "Média Geral", 50)); // Disco fixo em 50% por enquanto
         dto.matrizStress = matriz;
 
-        // 5. Hotspot (Exemplo Visual)
-        dto.hotspot = new ArrayList<>();
+        // 5. Hotspot (Exemplo Visual: Cria bolha vermelha se houver muitos críticos)
         if (countCritico > 0) {
-            dto.hotspot.add(new DashboardHolisticaDto.HotspotItem(1, "Área Crítica", 50, 50, 30, "rgba(231, 76, 60, 0.7)"));
+            hotspots.add(new DashboardHolisticaDto.HotspotItem(
+                    1,
+                    "Área Crítica",
+                    50, 50, 30, // Posição X, Y e Raio
+                    "rgba(231, 76, 60, 0.7)" // Cor Vermelha
+            ));
         }
+        dto.hotspot = hotspots;
 
         // 6. Capacidade e Saúde
-        dto.capacidade = new DashboardHolisticaDto.Capacidade(total, 1000);
+        dto.capacidade = new DashboardHolisticaDto.Capacidade(totalRegistros, 1000); // 1000 é um valor de exemplo para capacidade máxima
         dto.saudeBateria = new DashboardHolisticaDto.SaudeBateria(countSaudavel, countAtencao, countCritico);
 
         return dto;

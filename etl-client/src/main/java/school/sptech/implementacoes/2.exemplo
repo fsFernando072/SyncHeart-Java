@@ -6,44 +6,53 @@ Fazer a lógica de juntar o dado novo com o histórico antigo.
 Colem esse esqueleto abaixo e adaptem:
 
 #######################################
-package com.school.sptech.implementacoes;
+package school.sptech.implementacoes;
 
-import amazonaws.services.lambda.runtime.LambdaLogger;
+import com.amazonaws.services.lambda.runtime.LambdaLogger;
 import school.sptech.framework.ProcessadorBase;
-import school.sptech.dto.DashboardModelosDto; // Importe seu DTO
+import school.sptech.dto.DashboardModelosDto; // IMPORTANTE: Importe o SEU DTO aqui
 import java.util.List;
 import java.util.Map;
 
 public class ProcessadorSuaDashboard extends ProcessadorBase {
 
-    // IMPORTANTE: Defina um nome fixo.
-    private static final String NOME_ARQUIVO = "dashboard_modelos.json";
+    // IMPORTANTE: Defina um nome fixo para o arquivo
+    private static final String NOME_ARQUIVO_PADRAO = "dashboard_modelos.json";
 
     @Override
-    protected Object processarDados(List<Map<String, String>> dadosBrutos, LambdaLogger logger) {
-        
-        // 1. Gere o DTO com os dados atuais do CSV
+    protected Object processarDados(List<Map<String, String>> dadosBrutos, String nomeClinica, LambdaLogger logger) {
+
+        // Validação de segurança
+        if (dadosBrutos == null || dadosBrutos.isEmpty()) return null;
+
+        // 1. DEFINIR O CAMINHO CORRETO
+        // caminho: Ex: "Hospital_Sirio/dashboard_modelos.json"
+        String caminhoArquivo = nomeClinica + "/" + NOME_ARQUIVO_PADRAO;
+
+        logger.log("Atualizando dashboard '" + NOME_ARQUIVO_PADRAO + "' para a clínica: " + nomeClinica);
+
+        // 2. Gere o DTO com os dados atuais do CSV (Sua lógica de negócio)
         DashboardModelosDto dtoAtual = gerarDtoDoCsv(dadosBrutos);
 
-        // 2. Busque o histórico antigo no S3 (Método da classe mãe)
-        DashboardModelosDto dtoAntigo = lerJsonExistente(NOME_ARQUIVO, DashboardModelosDto.class);
+        // 3. Busque o histórico antigo NA PASTA DAQUELA CLÍNICA
+        // Note que passamos o 'caminhoArquivo' completo, não só o nome.
+        DashboardModelosDto dtoAntigo = lerJsonExistente(caminhoArquivo, DashboardModelosDto.class);
 
-        // 3. Lógica de Merge (Se existir histórico)
+        // 4. Lógica de Merge (Se existir histórico anterior)
         if (dtoAntigo != null) {
             // Exemplo: Pegar a lista do antigo e adicionar na frente do novo
-            dtoAtual.historico.addAll(0, dtoAntigo.historico);
-            
-            // Limitem o tamanho da lista (ex: últimos 20 registros) para o JSON não explodir
+            // dtoAtual.historico.addAll(0, dtoAntigo.historico);
+
+            // Dica: Limitem o tamanho da lista para o JSON não explodir
         }
 
-        // 4. Salve o arquivo atualizado
-        salvarJsonFixo(dtoAtual, NOME_ARQUIVO, logger);
+        // 5. Salve o arquivo na pasta correta
+        salvarJsonFixo(dtoAtual, caminhoArquivo, logger);
 
-        return null; // Retorna null para avisar a base que o arquivo já foi salvo manualmente.
+        return null; // Retorna null para avisar a base que o arquivo foi salvo manu8almente
     }
 
     private DashboardModelosDto gerarDtoDoCsv(List<Map<String, String>> dados) {
         // ... Sua lógica para montar o objeto ...
         return new DashboardModelosDto();
     }
-}
