@@ -1,0 +1,3 @@
+Criem uma classe no pacote dto que represente exatamente o JSON que vocês montaram para o front.
+Exemplo: DashboardModelosDto.java
+Dica: Usem classes estáticas (static class) dentro do DTO para organizar objetos complexos (listas, kpis, etc).

@@ -1,0 +1,8 @@
+Como estamos todos usando o mesmo .jar, a única coisa que diferencia a minha Lambda da de vocês é o Handler.
+Quando forem criar a função Lambda de vocês na console da AWS:
+Subam o nosso .jar.
+Vão em Runtime Settings -> Edit.
+No campo Handler, coloquem o caminho completo da SUA classe.
+
+Vai estar: example.Hello
+Correto: school.sptech.implementacoes.Processador"SuaDashboard"
