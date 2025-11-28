@@ -14,14 +14,6 @@
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
     </properties>
 
-    <repositories>
-        <repository>
-            <id>com.atlassian</id>
-            <name>Atlassian</name>
-            <url>https://maven.artifacts.atlassian.com/</url>
-        </repository>
-    </repositories>
-
     <dependencies>
         <dependency>
             <groupId>software.amazon.awssdk</groupId>
@@ -59,25 +51,6 @@
             <groupId>org.apache.httpcomponents</groupId>
             <artifactId>httpclient</artifactId>
             <version>4.5.14</version>
-        </dependency>
-
-        <dependency>
-            <groupId>io.atlassian.fugue</groupId>
-            <artifactId>fugue</artifactId>
-            <version>4.7.2</version>
-        </dependency>
-
-
-        <dependency>
-            <groupId>com.atlassian.jira</groupId>
-            <artifactId>jira-rest-java-client-api</artifactId>
-            <version>7.0.1</version>
-        </dependency>
-
-        <dependency>
-            <groupId>com.atlassian.jira</groupId>
-            <artifactId>jira-rest-java-client-core</artifactId>
-            <version>5.2.2</version>
         </dependency>
 
         <dependency>

@@ -1,7 +1,9 @@
 package school.sptech;
 
+import java.time.LocalDateTime;
+
 public class Log {
-    private String timestamp;
+    private LocalDateTime timestamp;
     private String id;
     private Boolean arritmia;
     private Double cpu;
@@ -11,7 +13,7 @@ public class Log {
     private Integer tarefas;
     private String listaTarefas;
 
-    public Log(String timestamp, String id, Boolean arritmia, Double cpu, Double ram, Double disco, Double bateria, Integer tarefas, String listaTarefas) {
+    public Log(LocalDateTime timestamp, String id, Boolean arritmia, Double cpu, Double ram, Double disco, Double bateria, Integer tarefas, String listaTarefas) {
         this.timestamp = timestamp;
         this.id = id;
         this.arritmia = arritmia;
@@ -23,11 +25,11 @@ public class Log {
         this.listaTarefas = listaTarefas;
     }
 
-    public String getTimestamp() {
+    public LocalDateTime getTimestamp() {
         return timestamp;
     }
 
-    public void setTimestamp(String timestamp) {
+    public void setTimestamp(LocalDateTime timestamp) {
         this.timestamp = timestamp;
     }
 

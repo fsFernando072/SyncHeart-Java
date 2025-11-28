@@ -26,21 +26,15 @@ import software.amazon.awssdk.transfer.s3.S3TransferManager;
 import software.amazon.awssdk.transfer.s3.model.*;
 
 import java.io.*;
-import java.net.URI;
-import java.net.URISyntaxException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
-
-import com.atlassian.jira.rest.client.api.JiraRestClient;
-import com.atlassian.jira.rest.client.api.JiraRestClientFactory;
-import com.atlassian.jira.rest.client.api.domain.input.IssueInput;
-import com.atlassian.jira.rest.client.api.domain.input.IssueInputBuilder;
-import com.atlassian.jira.rest.client.internal.async.AsynchronousJiraRestClientFactory;
 
 
 
@@ -52,13 +46,9 @@ public class Main {
         // Estabelecendo conexão com a AWS
         S3Client s3Client = S3Client.builder().region(Region.US_EAST_1).build();
 
-        baixarArquivos(s3Client, 1, "arquivos");
+        baixarArquivos(s3Client, 0, "arquivos");
         tratarDadosRaw();
-        enviarArquivos(s3Client, 2, "arquivos_tratados");
-
-//        baixarArquivos(s3Client, 2, "arquivos1");
-//        tratamentoClient();
-//        enviarArquivos(s3Client, 0, "arquivos_tratados1");
+        enviarArquivos(s3Client, 1, "arquivos_tratados");
 
     }
 
@@ -117,6 +107,7 @@ public class Main {
 
         DatabaseConfiguration databaseConfiguration = new DatabaseConfiguration();
         JdbcTemplate template = new JdbcTemplate(databaseConfiguration.getDataSource());
+        JiraTicketCreator jiraTicketCreator = new JiraTicketCreator();
 
         File pasta = new File("arquivos");
         File[] arquivos = pasta.listFiles();
@@ -135,6 +126,10 @@ public class Main {
         // Lista todos os arquivos na pasta arquivos e os modifica, enviando a nova versão para o diretório arquivos_tratados
         // Remove o diretório arquivos no final
         List<Clinica> clinicas = new ArrayList<>();
+        List<Log> alertasCpu = new ArrayList<>();
+        List<Log> alertasRam = new ArrayList<>();
+        List<Log> alertasDisco = new ArrayList<>();
+        List<Log> alertasBateria = new ArrayList<>();
         if (arquivos != null) {
             for (File arquivo : arquivos) {
                 try {
@@ -148,8 +143,9 @@ public class Main {
                     // Guarda os dados do arquivo em uma lista e cria um objeto Log com os dados
                     while ((line = reader.readLine()) != null) {
                         String[] dados = line.split(",");
+                        DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
 
-                        String timestamp = dados[0];
+                        LocalDateTime timestamp = LocalDateTime.parse(dados[0], formatter);
                         String id = dados[1];
                         Boolean arritmia = Boolean.parseBoolean(dados[2]);
                         Double cpu = Double.parseDouble(dados[3]);
@@ -160,6 +156,68 @@ public class Main {
                         String listaTarefas = dados[8];
 
                         Log log = new Log(timestamp, id, arritmia, cpu, ram, disco, bateria, tarefas, listaTarefas);
+
+                        List<Parametro> listaParametros = template.query("""
+                                SELECT metrica, condicao, limiar_valor, duracao_minutos from ModelosAlertaParametros mp
+                                WHERE mp.modelo_id = (SELECT modelo_id FROM Dispositivos WHERE dispositivo_uuid LIKE ?)
+                                """, new BeanPropertyRowMapper<>(Parametro.class),  "%" + log.getId() + "%");
+
+
+                        for (Parametro parametro : listaParametros) {
+                            if (parametro.getMetrica().equals("CPU") && log.getCpu() >= parametro.getLimiarValor()) {
+
+                                Clinica c = template.queryForObject(
+                                        """
+                                        SELECT clinica_id as id, nome_fantasia as nome FROM Clinicas
+                                        WHERE clinica_id = (SELECT clinica_id FROM EquipesCuidado WHERE equipe_id = (SELECT
+                                        equipe_id FROM Dispositivos WHERE dispositivo_uuid = ?))
+                                        """, new BeanPropertyRowMapper<>(Clinica.class), log.getId()
+                                );
+
+
+                                alertasCpu.add(log);
+                                Duration valor = Duration.ofSeconds(parametro.getDuracaoMinutos());
+                                jiraTicketCreator.criarTickets(alertasCpu, log.getCpu(), valor, "CPU", c.getNome());
+
+//                                salvarHistorico(template, log, "CPU", "CPU excedeu o limite");
+//                                enviarAlertas("CPU excedeu o limite");
+                            }
+                            else if (parametro.getMetrica().equals("RAM") && log.getRam() >= parametro.getLimiarValor()) {
+                                alertasRam.add(log);
+                                Duration valor = Duration.ofSeconds(parametro.getDuracaoMinutos());
+                                Clinica c = template.queryForObject(
+                                        """
+                                        SELECT clinica_id as id, nome_fantasia as nome FROM Clinicas
+                                        WHERE clinica_id = (SELECT clinica_id FROM EquipesCuidado WHERE equipe_id = (SELECT
+                                        equipe_id FROM Dispositivos WHERE dispositivo_uuid = ?))
+                                        """, new BeanPropertyRowMapper<>(Clinica.class), log.getId()
+                                );
+
+                                jiraTicketCreator.criarTickets(alertasRam, log.getRam(), valor, "RAM",c.getNome());
+//                                salvarHistorico(template, log, "RAM", "RAM excedeu o limite");
+//                                enviarAlertas("RAM excedeu o limite");
+                            }
+                            else if (parametro.getMetrica().equals("Bateria") && log.getBateria() <= parametro.getLimiarValor()) {
+                                alertasBateria.add(log);
+//                                salvarHistorico(template, log, "Bateria", "Bateria fraca");
+//                                enviarAlertas("Bateria fraca");
+                            }
+                            else if (parametro.getMetrica().equals("Disco") && log.getDisco() >= parametro.getLimiarValor()) {
+                                alertasDisco.add(log);
+                                Duration valor = Duration.ofSeconds(parametro.getDuracaoMinutos());
+                                Clinica c = template.queryForObject(
+                                        """
+                                        SELECT clinica_id as id, nome_fantasia as nome FROM Clinicas
+                                        WHERE clinica_id = (SELECT clinica_id FROM EquipesCuidado WHERE equipe_id = (SELECT
+                                        equipe_id FROM Dispositivos WHERE dispositivo_uuid = ?))
+                                        """, new BeanPropertyRowMapper<>(Clinica.class), log.getId()
+                                );
+
+                                jiraTicketCreator.criarTickets(alertasDisco, log.getDisco(), valor, "Disco", c.getNome());
+//                                salvarHistorico(template, log, "Disco", "Disco excedeu o limite");
+//                                enviarAlertas("Disco excedeu o limite");
+                            }
+                        }
 
 
                         Clinica c = template.queryForObject(
@@ -222,136 +280,6 @@ public class Main {
 
         System.out.println("Fim do tratamento");
         removerPasta("arquivos");
-
-    }
-
-    // Função para o tratamento final dos dados
-    public static void tratamentoClient() {
-        System.out.println("Iniciando tratamento final dos dados...");
-
-        DatabaseConfiguration databaseConfiguration = new DatabaseConfiguration();
-        JdbcTemplate template = new JdbcTemplate(databaseConfiguration.getDataSource());
-
-        File pasta = new File("arquivos1");
-        File[] arquivos = pasta.listFiles();
-
-        // Cria um novo diretório chamado "arquivos_tratados" para conter a modificação dos arquivos
-        try {
-            Path pastaTratada = Paths.get("arquivos_tratados1");
-            Files.createDirectories(pastaTratada);
-        }
-        catch (IOException erro) {
-            System.out.println("Erro ao criar a pasta");
-            erro.printStackTrace();
-            System.exit(1);
-        }
-
-        // Lista todos os arquivos na pasta arquivos e os modifica, enviando a nova versão para o diretório arquivos_tratados
-        // Remove o diretório arquivos no final
-        if (arquivos != null) {
-            for (File arquivo : arquivos) {
-                try {
-                    FileInputStream inputStream = new FileInputStream("arquivos1/" + arquivo.getName());
-                    BufferedReader reader = new BufferedReader(new InputStreamReader(inputStream));
-                    OutputStream outputStream = new FileOutputStream("arquivos_tratados1/" + arquivo.getName());
-                    BufferedWriter writer = new BufferedWriter(new OutputStreamWriter(outputStream));
-                    String line;
-                    List<Log> logs = new ArrayList<>();
-
-                    // Ignora a primeira linha do arquivo (ou seja, o header)
-                    reader.readLine();
-
-                    // Guarda os dados do arquivo em uma lista e cria um objeto Log com os dados
-                    while ((line = reader.readLine()) != null) {
-                        String[] dados = line.split(";");
-
-                        String timestamp = dados[0];
-                        String id = dados[1];
-                        Boolean arritmia = Boolean.parseBoolean(dados[2]);
-                        Double cpu = Double.parseDouble(dados[3]);
-                        Double ram = Double.parseDouble(dados[4]);
-                        Double disco = Double.parseDouble(dados[5]);
-                        Double bateria = Double.parseDouble(dados[6]);
-                        Integer tarefas = Integer.parseInt(dados[7]);
-                        String listaTarefas = dados[8];
-
-                        Log log = new Log(timestamp, id, arritmia, cpu, ram, disco, bateria, tarefas, listaTarefas);
-                        logs.add(log);
-
-
-                        List<Parametro> listaParametros = template.query("""
-                                SELECT metrica, condicao, limiar_valor from ModelosAlertaParametros mp
-                                WHERE mp.modelo_id = (SELECT modelo_id FROM Dispositivos WHERE dispositivo_uuid LIKE ?)
-                                """, new BeanPropertyRowMapper<>(Parametro.class),  "%" + log.getId() + "%");
-
-
-                        for (Parametro parametro : listaParametros) {
-                            if (parametro.getMetrica().equals("CPU") && log.getCpu() >= parametro.getLimiarValor()) {
-                                salvarHistorico(template, log, "CPU", "CPU excedeu o limite");
-                                enviarAlertas("CPU excedeu o limite");
-                            }
-                            else if (parametro.getMetrica().equals("RAM") && log.getRam() >= parametro.getLimiarValor()) {
-                                salvarHistorico(template, log, "RAM", "RAM excedeu o limite");
-                                enviarAlertas("RAM excedeu o limite");
-                            }
-                            else if (parametro.getMetrica().equals("Bateria") && log.getBateria() <= parametro.getLimiarValor()) {
-                                salvarHistorico(template, log, "Bateria", "Bateria fraca");
-                                enviarAlertas("Bateria fraca");
-                            }
-                            else if (parametro.getMetrica().equals("Disco") && log.getDisco() >= parametro.getLimiarValor()) {
-                                salvarHistorico(template, log, "Disco", "Disco excedeu o limite");
-                                enviarAlertas("Disco excedeu o limite");
-                            }
-                        }
-
-
-                    }
-
-                    // Formata os dados e escreve em um novo arquivo
-                    try {
-                        writer.append("TIMESTAMP;UUID;ARRITMIA;CPU;RAM;DISCO;BATERIA;QTD_TAREFAS;TAREFAS\n");
-
-                        for (Log log : logs) {
-                            writer.write(String.format("%s;%s;%b;%.1f;%.1f;%.1f;%.1f;%d;%s\n", log.getTimestamp(),
-                                    log.getId(), log.getArritmia(), log.getCpu(), log.getRam(), log.getDisco(), log.getBateria(),
-                                    log.getTarefas(), log.getListaTarefas()).replace(",", "."));
-                        }
-                    }
-                    catch (IOException erro) {
-                        System.out.println("Erro ao escrever o arquivo");
-                        erro.printStackTrace();
-                    }
-                    finally {
-                        try {
-                            writer.close();
-                            reader.close();
-                            outputStream.close();
-                            inputStream.close();
-                        }
-                        catch (IOException erro) {
-                            System.out.println("Erro ao fechar o arquivo");
-                            erro.printStackTrace();
-                            System.exit(1);
-                        }
-                    }
-
-
-
-                }
-                catch (IOException erro) {
-                    System.out.println("Falha ao abrir o arquivo");
-                    erro.printStackTrace();
-                    System.exit(1);
-                }
-            }
-        }
-        else {
-            System.out.println("Diretório não encontrado.");
-            System.exit(1);
-        }
-
-        System.out.println("Fim do tratamento");
-        removerPasta("arquivos1");
 
     }
 
@@ -495,40 +423,6 @@ public class Main {
         System.out.println("Envio de arquivos concluído com sucesso");
         removerPasta(nomePasta);
 
-    }
-
-    public static void enviarAlertas(String descricao) {
-        try {
-            JiraRestClientFactory factory = new AsynchronousJiraRestClientFactory();
-            Dotenv dotenv = Dotenv.load();
-            String tokenJira = dotenv.get("JIRA_API_TOKEN");
-
-            URI jiraServerUri = new URI("https://sptech-team-tll0v8wj.atlassian.net");
-            try (JiraRestClient restClient = factory.createWithBasicHttpAuthentication(jiraServerUri, "davi.ssilva@sptech.school", tokenJira)) {
-
-                IssueInputBuilder issueBuilder = new IssueInputBuilder("AAC", 10036L);
-                issueBuilder.setSummary("Alerta detectado");
-                issueBuilder.setDescription("Descrição da tarefa: {" + descricao + "}");
-                IssueInput issueInput = issueBuilder.build();
-
-                restClient.getIssueClient().createIssue(issueInput).claim();
-            }
-        }
-        catch (URISyntaxException erro) {
-            erro.printStackTrace();
-        }
-        catch (IOException erro) {
-            erro.printStackTrace();
-        }
-    }
-
-    public static void salvarHistorico(JdbcTemplate template, Log log, String componente, String mensagem) {
-        String sqlInsert = """
-                                        INSERT INTO Alertas (dispositivo_id, tipo_alerta, mensagem, detectado_em)
-                                                      values((SELECT dispositivo_id FROM Dispositivos WHERE dispositivo_uuid LIKE ?), ?, ?, ?)
-                                        """;
-
-        template.update(sqlInsert, log.getId(), componente, mensagem, LocalDate.now());
     }
 
 }

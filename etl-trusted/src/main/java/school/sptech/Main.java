@@ -105,6 +105,8 @@ public class Main {
                                 .prefix(c.getNome() + "/")
                                 .maxKeys(1)
                                 .build();
+
+
                     }
 
                     PutObjectRequest putObjectRequest = PutObjectRequest.builder().bucket("s3-trusted-lab-202523112058").key(logs.get(0).getTimestamp().toString() + ".csv").build();

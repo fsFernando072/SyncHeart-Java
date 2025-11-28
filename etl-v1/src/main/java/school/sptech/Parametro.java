@@ -4,11 +4,13 @@ public class Parametro {
     private String metrica;
     private String condicao;
     private Double limiarValor;
+    private Integer duracaoMinutos;
 
-    public Parametro(String metrica, String condicao, Double limiarValor) {
+    public Parametro(String metrica, String condicao, Double limiarValor, Integer duracaoMinutos) {
         this.metrica = metrica;
         this.condicao = condicao;
         this.limiarValor = limiarValor;
+        this.duracaoMinutos = duracaoMinutos;
     }
 
     public Parametro() {
@@ -37,5 +39,13 @@ public class Parametro {
 
     public void setLimiarValor(Double limiarValor) {
         this.limiarValor = limiarValor;
+    }
+
+    public Integer getDuracaoMinutos() {
+        return duracaoMinutos;
+    }
+
+    public void setDuracaoMinutos(Integer duracaoMinutos) {
+        this.duracaoMinutos = duracaoMinutos;
     }
 }
