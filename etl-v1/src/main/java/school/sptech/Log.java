@@ -4,7 +4,7 @@ import java.time.LocalDateTime;
 
 public class Log {
     private LocalDateTime timestamp;
-    private String id;
+    private String uuid;
     private Boolean arritmia;
     private Double cpu;
     private Double ram;
@@ -13,9 +13,9 @@ public class Log {
     private Integer tarefas;
     private String listaTarefas;
 
-    public Log(LocalDateTime timestamp, String id, Boolean arritmia, Double cpu, Double ram, Double disco, Double bateria, Integer tarefas, String listaTarefas) {
+    public Log(LocalDateTime timestamp, String uuid, Boolean arritmia, Double cpu, Double ram, Double disco, Double bateria, Integer tarefas, String listaTarefas) {
         this.timestamp = timestamp;
-        this.id = id;
+        this.uuid = uuid;
         this.arritmia = arritmia;
         this.cpu = cpu;
         this.ram = ram;
@@ -33,12 +33,12 @@ public class Log {
         this.timestamp = timestamp;
     }
 
-    public String getId() {
-        return id;
+    public String getUuid() {
+        return uuid;
     }
 
-    public void setId(String id) {
-        this.id = id;
+    public void setUuid(String uuid) {
+        this.uuid = uuid;
     }
 
     public Boolean getArritmia() {
@@ -101,7 +101,7 @@ public class Log {
     public String toString() {
         return "Log{" +
                 "timestamp='" + timestamp + '\'' +
-                ", id='" + id + '\'' +
+                ", id='" + uuid + '\'' +
                 ", arritmia=" + arritmia +
                 ", cpu=" + cpu +
                 ", ram=" + ram +

@@ -55,7 +55,7 @@ public class JiraTicketCreator {
     /**
      * Filtra a lista e cria um ticket no Jira para cada Alerta CRÍTICO.
      */
-    public void criarTickets(List<Log> alertas, Double captura, Duration valor, String componente, String nomeClinica) {
+    public void criarTickets(List<Log> alertas, Integer idModelo, Double captura, Duration valor, String componente, String nomeClinica) {
 
         System.out.println("--- Iniciando verificação de alertas para o Jira ---");
 
@@ -89,13 +89,14 @@ public class JiraTicketCreator {
 
                     String description = String.format(
                             """
-                                    Marcapasso UUID: %s
-                                    Componente: %s
-                                    Duração: %s
-                                    Valor detectado: %s
-                                    Horário: %s - %s
+                            Dispositivo_UUID: %s
+                            Modelo_ID: %d
+                            Componente: %s
+                            Duração: %s
+                            Valor detectado: %s
+                            Horário: %s - %s
                             """,
-                            log.getId(), componente, duracaoAlerta, captura, inicio, fim
+                            log.getUuid(), idModelo, componente, duracaoAlerta, captura, inicio, fim
                     );
 
                     String jsonPayload = buildIssueJson(summary, description, nomeClinica);
@@ -145,7 +146,7 @@ public class JiraTicketCreator {
                 adfDescription, // adfDescription é um JSON e é inserido sem aspas adicionais
                 jiraIssueTypeName,
                 jiraPriorityName,
-                nomeClinica
+                nomeClinica.replaceAll(" ", "_")
         );
     }
 

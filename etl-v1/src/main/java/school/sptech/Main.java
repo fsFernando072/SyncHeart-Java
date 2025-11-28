@@ -16,7 +16,6 @@ package school.sptech;
 
 
 // Importando as dependências necessárias
-import io.github.cdimascio.dotenv.Dotenv;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.core.BeanPropertyRowMapper;
 import software.amazon.awssdk.regions.Region;
@@ -160,7 +159,7 @@ public class Main {
                         List<Parametro> listaParametros = template.query("""
                                 SELECT metrica, condicao, limiar_valor, duracao_minutos from ModelosAlertaParametros mp
                                 WHERE mp.modelo_id = (SELECT modelo_id FROM Dispositivos WHERE dispositivo_uuid LIKE ?)
-                                """, new BeanPropertyRowMapper<>(Parametro.class),  "%" + log.getId() + "%");
+                                """, new BeanPropertyRowMapper<>(Parametro.class),  "%" + log.getUuid() + "%");
 
 
                         for (Parametro parametro : listaParametros) {
@@ -171,36 +170,47 @@ public class Main {
                                         SELECT clinica_id as id, nome_fantasia as nome FROM Clinicas
                                         WHERE clinica_id = (SELECT clinica_id FROM EquipesCuidado WHERE equipe_id = (SELECT
                                         equipe_id FROM Dispositivos WHERE dispositivo_uuid = ?))
-                                        """, new BeanPropertyRowMapper<>(Clinica.class), log.getId()
+                                        """, new BeanPropertyRowMapper<>(Clinica.class), log.getUuid()
+                                );
+
+                                Modelo m = template.queryForObject(
+                                        """
+                                            SELECT modelo_id id, nome_modelo nome FROM Modelos
+                                            WHERE modelo_id = (SELECT modelo_id FROM Dispositivos WHERE dispositivo_uuid = ?)
+                                            
+                                            """, new BeanPropertyRowMapper<>(Modelo.class), log.getUuid()
                                 );
 
 
                                 alertasCpu.add(log);
                                 Duration valor = Duration.ofSeconds(parametro.getDuracaoMinutos());
-                                jiraTicketCreator.criarTickets(alertasCpu, log.getCpu(), valor, "CPU", c.getNome());
-
-//                                salvarHistorico(template, log, "CPU", "CPU excedeu o limite");
-//                                enviarAlertas("CPU excedeu o limite");
+                                jiraTicketCreator.criarTickets(alertasCpu,  m.getId(), log.getCpu(), valor, "CPU", c.getNome());
                             }
                             else if (parametro.getMetrica().equals("RAM") && log.getRam() >= parametro.getLimiarValor()) {
                                 alertasRam.add(log);
                                 Duration valor = Duration.ofSeconds(parametro.getDuracaoMinutos());
+
                                 Clinica c = template.queryForObject(
                                         """
                                         SELECT clinica_id as id, nome_fantasia as nome FROM Clinicas
                                         WHERE clinica_id = (SELECT clinica_id FROM EquipesCuidado WHERE equipe_id = (SELECT
                                         equipe_id FROM Dispositivos WHERE dispositivo_uuid = ?))
-                                        """, new BeanPropertyRowMapper<>(Clinica.class), log.getId()
+                                        """, new BeanPropertyRowMapper<>(Clinica.class), log.getUuid()
                                 );
 
-                                jiraTicketCreator.criarTickets(alertasRam, log.getRam(), valor, "RAM",c.getNome());
-//                                salvarHistorico(template, log, "RAM", "RAM excedeu o limite");
-//                                enviarAlertas("RAM excedeu o limite");
+                                Modelo m = template.queryForObject(
+                                        """
+                                            SELECT modelo_id id, nome_modelo nome FROM Modelos
+                                            WHERE modelo_id = (SELECT modelo_id FROM Dispositivos WHERE dispositivo_uuid = ?)
+                                            
+                                            """, new BeanPropertyRowMapper<>(Modelo.class), log.getUuid()
+                                );
+
+                                jiraTicketCreator.criarTickets(alertasRam, m.getId(), log.getRam(), valor, "RAM",c.getNome());
+
                             }
                             else if (parametro.getMetrica().equals("Bateria") && log.getBateria() <= parametro.getLimiarValor()) {
                                 alertasBateria.add(log);
-//                                salvarHistorico(template, log, "Bateria", "Bateria fraca");
-//                                enviarAlertas("Bateria fraca");
                             }
                             else if (parametro.getMetrica().equals("Disco") && log.getDisco() >= parametro.getLimiarValor()) {
                                 alertasDisco.add(log);
@@ -210,12 +220,18 @@ public class Main {
                                         SELECT clinica_id as id, nome_fantasia as nome FROM Clinicas
                                         WHERE clinica_id = (SELECT clinica_id FROM EquipesCuidado WHERE equipe_id = (SELECT
                                         equipe_id FROM Dispositivos WHERE dispositivo_uuid = ?))
-                                        """, new BeanPropertyRowMapper<>(Clinica.class), log.getId()
+                                        """, new BeanPropertyRowMapper<>(Clinica.class), log.getUuid()
                                 );
 
-                                jiraTicketCreator.criarTickets(alertasDisco, log.getDisco(), valor, "Disco", c.getNome());
-//                                salvarHistorico(template, log, "Disco", "Disco excedeu o limite");
-//                                enviarAlertas("Disco excedeu o limite");
+                                Modelo m = template.queryForObject(
+                                        """
+                                            SELECT modelo_id id, nome_modelo nome FROM Modelos
+                                            WHERE modelo_id = (SELECT modelo_id FROM Dispositivos WHERE dispositivo_uuid = ?)
+                                            
+                                            """, new BeanPropertyRowMapper<>(Modelo.class), log.getUuid()
+                                );
+
+                                jiraTicketCreator.criarTickets(alertasDisco, m.getId(), log.getDisco(), valor, "Disco", c.getNome());
                             }
                         }
 
@@ -225,8 +241,10 @@ public class Main {
                                 SELECT clinica_id as id, nome_fantasia as nome FROM Clinicas
                                 WHERE clinica_id = (SELECT clinica_id FROM EquipesCuidado WHERE equipe_id = (SELECT
                                 equipe_id FROM Dispositivos WHERE dispositivo_uuid = ?))
-                                """, new BeanPropertyRowMapper<>(Clinica.class), log.getId()
+                                """, new BeanPropertyRowMapper<>(Clinica.class), log.getUuid()
                         );
+
+
 
                         Boolean repete = false;
                         for (Clinica clinica : clinicas) {
@@ -335,7 +353,7 @@ public class Main {
 
                         for (Log log : c.getListaLogs()) {
                             writer.write(String.format("%s;%s;%b;%.1f;%.1f;%.1f;%.1f;%d;%s\n", log.getTimestamp(),
-                                    log.getId(), log.getArritmia(), log.getCpu(), log.getRam(), log.getDisco(), log.getBateria(),
+                                    log.getUuid(), log.getArritmia(), log.getCpu(), log.getRam(), log.getDisco(), log.getBateria(),
                                     log.getTarefas(), log.getListaTarefas()).replace(",", "."));
                         }
             }
