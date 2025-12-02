@@ -32,6 +32,7 @@ import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.time.Duration;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 
@@ -184,7 +185,7 @@ public class Main {
 
                                 alertasCpu.add(log);
                                 Duration valor = Duration.ofSeconds(parametro.getDuracaoMinutos());
-                                jiraTicketCreator.criarTickets(alertasCpu,  m.getId(), log.getCpu(), valor, "CPU", c.getNome());
+//                              jiraTicketCreator.criarTickets(alertasCpu,  m.getId(), log.getCpu(), valor, "CPU", c.getNome());
                             }
                             else if (parametro.getMetrica().equals("RAM") && log.getRam() >= parametro.getLimiarValor()) {
                                 alertasRam.add(log);
@@ -206,7 +207,7 @@ public class Main {
                                             """, new BeanPropertyRowMapper<>(Modelo.class), log.getUuid()
                                 );
 
-                                jiraTicketCreator.criarTickets(alertasRam, m.getId(), log.getRam(), valor, "RAM",c.getNome());
+//                                jiraTicketCreator.criarTickets(alertasRam, m.getId(), log.getRam(), valor, "RAM",c.getNome());
 
                             }
                             else if (parametro.getMetrica().equals("Bateria") && log.getBateria() <= parametro.getLimiarValor()) {
@@ -231,7 +232,7 @@ public class Main {
                                             """, new BeanPropertyRowMapper<>(Modelo.class), log.getUuid()
                                 );
 
-                                jiraTicketCreator.criarTickets(alertasDisco, m.getId(), log.getDisco(), valor, "Disco", c.getNome());
+//                                jiraTicketCreator.criarTickets(alertasDisco, m.getId(), log.getDisco(), valor, "Disco", c.getNome());
                             }
                         }
 
@@ -286,7 +287,18 @@ public class Main {
             }
 
             for (Clinica c : clinicas) {
-                criarPastasClinicas(c, "arquivos_tratados/");
+                List<String> filtroUuid = new ArrayList<>();
+                c.getListaLogs().sort(Comparator.comparing(Log::getTimestamp));
+
+                for (Log log : c.getListaLogs()) {
+
+                    if (!filtroUuid.contains(log.getUuid())) {
+                        filtroUuid.add(log.getUuid());
+                    }
+
+                }
+
+                criarPastasClinicas(c, filtroUuid,"arquivos_tratados/", template);
             }
 
 
@@ -328,54 +340,87 @@ public class Main {
         System.out.println("Diretório excluído com sucesso");
     }
 
-    public static void criarPastasClinicas(Clinica c, String caminhoPasta) {
-        String caminhoCompleto = caminhoPasta + c.getNome();
-        if (Files.notExists(Paths.get(caminhoCompleto))) {
-            try {
-                Files.createDirectories(Paths.get(caminhoCompleto));
+    public static void criarPastasClinicas(Clinica c, List<String> listaUuid, String caminhoPasta, JdbcTemplate template) {
+
+
+        for (String uuid : listaUuid) {
+            List<Log> logsFiltrados = new ArrayList<>();
+
+            Modelo m = template.queryForObject(
+                    """
+                        SELECT modelo_id id, nome_modelo nome FROM Modelos WHERE modelo_id = (SELECT modelo_id FROM Dispositivos WHERE dispositivo_uuid = ?)
+                        """, new BeanPropertyRowMapper<>(Modelo.class), uuid
+            );
+
+            String caminhoCompleto = caminhoPasta + c.getNome() + "/" + m.getNome() + "/" + uuid;
+
+            if (Files.notExists(Paths.get(caminhoCompleto))) {
+                try {
+                    Files.createDirectories(Paths.get(caminhoCompleto));
+                }
+                catch (IOException erro) {
+                    System.out.println("Erro ao criar a pasta");
+                    erro.printStackTrace();
+                }
             }
-            catch (IOException erro) {
-                System.out.println("Erro ao criar a pasta");
-                erro.printStackTrace();
+
+            for (Log log : c.getListaLogs()) {
+                if (log.getUuid().equals(uuid)) {
+                    logsFiltrados.add(log);
+                }
             }
+
+            juntarArquivos(logsFiltrados, caminhoCompleto);
         }
 
-        juntarArquivos(c, caminhoCompleto);
+
     }
 
-    public static void juntarArquivos(Clinica c, String caminhoCompleto) {
-        try {
-            OutputStream outputStream = new FileOutputStream(caminhoCompleto + "/" + c.getListaLogs().getFirst().getTimestamp());
-            BufferedWriter writer = new BufferedWriter(new OutputStreamWriter(outputStream));
+    public static void juntarArquivos(List<Log> logsFiltrados, String caminhoCompleto) {
 
-            try {
-                writer.append("TIMESTAMP;UUID;ARRITMIA;CPU;RAM;DISCO;BATERIA;QTD_TAREFAS;TAREFAS\n");
+                try {
+                    logsFiltrados.sort(Comparator.comparing(Log::getTimestamp));
+                    String dataFormatada = logsFiltrados.get(0).getTimestamp().toString().replace("T", " ");
 
-                        for (Log log : c.getListaLogs()) {
-                            writer.write(String.format("%s;%s;%b;%.1f;%.1f;%.1f;%.1f;%d;%s\n", log.getTimestamp(),
+                    OutputStream outputStream = new FileOutputStream(caminhoCompleto + "/" + dataFormatada + ".csv");
+                    BufferedWriter writer = new BufferedWriter(new OutputStreamWriter(outputStream));
+
+                    try {
+
+                        writer.append("TIMESTAMP;UUID;ARRITMIA;CPU;RAM;DISCO;BATERIA;QTD_TAREFAS;TAREFAS\n");
+
+                        for (Log log : logsFiltrados) {
+                            String dataSemT = log.getTimestamp().toString().replace("T", " ");
+
+                            writer.write(String.format("%s;%s;%b;%.1f;%.1f;%.1f;%.1f;%d;%s\n", dataSemT,
                                     log.getUuid(), log.getArritmia(), log.getCpu(), log.getRam(), log.getDisco(), log.getBateria(),
                                     log.getTarefas(), log.getListaTarefas()).replace(",", "."));
                         }
-            }
-            catch (IOException erro) {
-                System.out.println("Erro ao escrever o arquivo");
-                erro.printStackTrace();
-            }
-            finally {
-                try {
-                    writer.close();
-                    outputStream.close();
+                    }
+                    catch (IOException erro) {
+                        System.out.println("Erro ao escrever o arquivo");
+                        erro.printStackTrace();
+                    }
+                    finally {
+                        try {
+                            writer.close();
+                            outputStream.close();
+                        }
+                        catch (IOException erro) {
+                            System.out.println("Erro ao fechar o arquivo");
+                            erro.printStackTrace();
+                            System.exit(1);
+                        }
+                    }
+
                 }
-                catch (IOException erro) {
-                    System.out.println("Erro ao fechar o arquivo");
+                catch (FileNotFoundException erro) {
+                    System.out.println("Diretório não encontrado");
                     erro.printStackTrace();
-                    System.exit(1);
                 }
-            }
-        } catch (FileNotFoundException erro) {
-            System.out.println("Diretório não encontrado");
-            erro.printStackTrace();
-        }
+
+                atualizarUltimaCaptura(logsFiltrados.getLast());
+
 
     }
 
@@ -441,6 +486,16 @@ public class Main {
         System.out.println("Envio de arquivos concluído com sucesso");
         removerPasta(nomePasta);
 
+    }
+
+    public static void atualizarUltimaCaptura(Log log) {
+        DatabaseConfiguration databaseConfiguration = new DatabaseConfiguration();
+        JdbcTemplate template = new JdbcTemplate(databaseConfiguration.getDataSource());
+
+        String dataFormatada = log.getTimestamp().toString().replace("T", " ");
+
+        String sqlUpdate = "UPDATE Dispositivos SET ultima_atualizacao = ? WHERE dispositivo_uuid = ?";
+        template.update(sqlUpdate, dataFormatada, log.getUuid());
     }
 
 }
