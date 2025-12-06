@@ -55,7 +55,7 @@ public class JiraTicketCreator {
     /**
      * Filtra a lista e cria um ticket no Jira para cada Alerta CRÍTICO.
      */
-    public void criarTickets(List<Log> alertas, Integer idModelo, Double captura, Duration valor, String componente, String nomeClinica) {
+    public void criarTickets(List<Log> alertas, Integer idModelo, Double captura, int valor, String componente, String nomeClinica) {
 
         System.out.println("--- Iniciando verificação de alertas para o Jira ---");
 
@@ -82,8 +82,12 @@ public class JiraTicketCreator {
             }
 
             Duration duracaoAlerta = Duration.between(inicio, fim);
+            Long diferencaTotal = duracaoAlerta.toSeconds();
 
-            if (duracaoAlerta.compareTo(valor) >= 0) {
+            int diferencaTotalInt = Math.toIntExact(diferencaTotal);
+
+
+            if (diferencaTotalInt > valor) {
                 try {
                     String summary = String.format("%s ATINGIU %s%%", componente, captura);
                     String duracaoAlertaFormatado = duracaoAlerta.toString().replace("PT", " ");
@@ -118,16 +122,42 @@ public class JiraTicketCreator {
         System.out.println("--- Verificação de alertas concluída ---");
     }
 
-    public void criarTickets(List<Log> alertas, Integer idModelo, Double captura, LocalDateTime horario, String nomeClinica) {
+    public void criarTickets(List<Log> alertas, Integer idModelo, Double captura, String componente, String nomeClinica) {
+
+        alertas.sort(Comparator.comparing(Log::getTimestamp));
+
+        for (Log log : alertas) {
+
+                String summary = String.format("Disco ATINGIU %s%%", captura);
+
+                try {
+                    String description = String.format(
+                            """
+                            Dispositivo_UUID: %s
+                            Modelo_ID: %d
+                            Componente: %s
+                            Valor detectado: %s%%
+                            Horário: %s
+                            """,
+                            log.getUuid(), idModelo,  componente, log.getDisco(), log.getTimestamp()
+                    );
+
+                    String jsonPayload = buildIssueJson(summary, description, nomeClinica);
+                    enviarRequisicao(jsonPayload);
+                }
+                catch (Exception e) {
+                    System.out.println("Ocorreu um erro ao processar o alerta!");
+                    e.printStackTrace();
+                }
+        }
+    }
+
+    public void criarTickets(List<Log> alertas, Integer idModelo, Double captura, String nomeClinica) {
         System.out.println("--- Iniciando verificação de alertas para o Jira ---");
 
         alertas.sort(Comparator.comparing(Log::getTimestamp));
 
-        List<Double> valoresDetectados = new ArrayList<>();
-
         for (Log log : alertas) {
-            if (!valoresDetectados.contains(log.getBateria())) {
-                valoresDetectados.add(log.getBateria());
 
                 String summary = String.format("Bateria ATINGIU %s%%", captura);
 
@@ -150,7 +180,7 @@ public class JiraTicketCreator {
                     System.out.println("Ocorreu um erro ao processar o alerta!");
                     e.printStackTrace();
                 }
-            }
+
         }
     }
 

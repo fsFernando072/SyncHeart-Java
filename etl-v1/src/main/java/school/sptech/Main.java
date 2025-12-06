@@ -46,9 +46,9 @@ public class Main {
         // Estabelecendo conexão com a AWS
         S3Client s3Client = S3Client.builder().region(Region.US_EAST_1).build();
 
-        baixarArquivos(s3Client, 0, "arquivos");
+        baixarArquivos(s3Client, 1, "arquivos");
         tratarDadosRaw();
-        enviarArquivos(s3Client, 1, "arquivos_tratados");
+        enviarArquivos(s3Client, 2, "arquivos_tratados");
 
     }
 
@@ -126,12 +126,13 @@ public class Main {
         // Lista todos os arquivos na pasta arquivos e os modifica, enviando a nova versão para o diretório arquivos_tratados
         // Remove o diretório arquivos no final
         List<Clinica> clinicas = new ArrayList<>();
-        List<Log> alertasCpu = new ArrayList<>();
-        List<Log> alertasRam = new ArrayList<>();
-        List<Log> alertasDisco = new ArrayList<>();
-        List<Log> alertasBateria = new ArrayList<>();
         if (arquivos != null) {
             for (File arquivo : arquivos) {
+                List<Log> alertasCpu = new ArrayList<>();
+                List<Log> alertasRam = new ArrayList<>();
+                List<Log> alertasDisco = new ArrayList<>();
+                List<Log> alertasBateria = new ArrayList<>();
+
                 try {
                     FileInputStream inputStream = new FileInputStream("arquivos/" + arquivo.getName());
                     BufferedReader reader = new BufferedReader(new InputStreamReader(inputStream));
@@ -184,12 +185,13 @@ public class Main {
 
 
                                 alertasCpu.add(log);
-                                Duration valor = Duration.ofSeconds(parametro.getDuracaoMinutos());
+                                int valor = parametro.getDuracaoMinutos() * 60;
                               jiraTicketCreator.criarTickets(alertasCpu,  m.getId(), log.getCpu(), valor, "CPU", c.getNome());
                             }
                             else if (parametro.getMetrica().equals("RAM") && log.getRam() >= parametro.getLimiarValor()) {
                                 alertasRam.add(log);
-                                Duration valor = Duration.ofSeconds(parametro.getDuracaoMinutos());
+
+                                int valor = parametro.getDuracaoMinutos() * 60;
 
                                 Clinica c = template.queryForObject(
                                         """
@@ -211,7 +213,6 @@ public class Main {
 
                             }
                             else if (parametro.getMetrica().equals("Bateria") && log.getBateria() <= parametro.getLimiarValor()) {
-                                alertasBateria.add(log);
 
                                 Clinica c = template.queryForObject(
                                         """
@@ -229,12 +230,15 @@ public class Main {
                                             """, new BeanPropertyRowMapper<>(Modelo.class), log.getUuid()
                                 );
 
-                                jiraTicketCreator.criarTickets(alertasBateria, m.getId(), log.getBateria(), log.getTimestamp(), c.getNome());
+                                if (alertasBateria.isEmpty() || log.getBateria() < (alertasBateria.getLast().getBateria() - 1)) {
+                                    alertasBateria.add(log);
+                                    jiraTicketCreator.criarTickets(alertasBateria, m.getId(), log.getBateria(), c.getNome());
+                                }
 
                             }
                             else if (parametro.getMetrica().equals("Disco") && log.getDisco() >= parametro.getLimiarValor()) {
-                                alertasDisco.add(log);
-                                Duration valor = Duration.ofSeconds(parametro.getDuracaoMinutos());
+
+
                                 Clinica c = template.queryForObject(
                                         """
                                         SELECT clinica_id as id, nome_fantasia as nome FROM Clinicas
@@ -251,7 +255,10 @@ public class Main {
                                             """, new BeanPropertyRowMapper<>(Modelo.class), log.getUuid()
                                 );
 
-                                jiraTicketCreator.criarTickets(alertasDisco, m.getId(), log.getDisco(), valor, "Disco", c.getNome());
+                                if (alertasDisco.isEmpty() || log.getDisco() > (alertasDisco.getLast().getDisco() + 5)) {
+                                    alertasDisco.add(log);
+                                    jiraTicketCreator.criarTickets(alertasDisco, m.getId(), log.getDisco(), "Disco", c.getNome());
+                                }
                             }
                         }
 
