@@ -85,7 +85,10 @@ public class JiraTicketCreator {
 
             if (duracaoAlerta.compareTo(valor) >= 0) {
                 try {
-                    String summary = "ALERTA DETECTADO!";
+                    String summary = String.format("%s ATINGIU %s%%", componente, captura);
+                    String duracaoAlertaFormatado = duracaoAlerta.toString().replace("PT", " ");
+                    String inicioFormatado = inicio.toString().replace("T", " ");
+                    String fimFormatado = fim.toString().replace("T", " ");
 
                     String description = String.format(
                             """
@@ -93,10 +96,10 @@ public class JiraTicketCreator {
                             Modelo_ID: %d
                             Componente: %s
                             Duração: %s
-                            Valor detectado: %s
+                            Valor detectado: %s%%
                             Horário: %s - %s
                             """,
-                            log.getUuid(), idModelo, componente, duracaoAlerta, captura, inicio, fim
+                            log.getUuid(), idModelo, componente, duracaoAlertaFormatado, captura, inicioFormatado, fimFormatado
                     );
 
                     String jsonPayload = buildIssueJson(summary, description, nomeClinica);
@@ -107,15 +110,48 @@ public class JiraTicketCreator {
                     e.printStackTrace();
                 }
 
-                inicio = null;
-                fim = null;
-
             }
 
 
         }
 
         System.out.println("--- Verificação de alertas concluída ---");
+    }
+
+    public void criarTickets(List<Log> alertas, Integer idModelo, Double captura, LocalDateTime horario, String nomeClinica) {
+        System.out.println("--- Iniciando verificação de alertas para o Jira ---");
+
+        alertas.sort(Comparator.comparing(Log::getTimestamp));
+
+        List<Double> valoresDetectados = new ArrayList<>();
+
+        for (Log log : alertas) {
+            if (!valoresDetectados.contains(log.getBateria())) {
+                valoresDetectados.add(log.getBateria());
+
+                String summary = String.format("Bateria ATINGIU %s%%", captura);
+
+                try {
+                    String description = String.format(
+                            """
+                            Dispositivo_UUID: %s
+                            Modelo_ID: %d
+                            Componente: %s
+                            Valor detectado: %s%%
+                            Horário: %s
+                            """,
+                            log.getUuid(), idModelo, "Bateria", log.getBateria(), log.getTimestamp()
+                    );
+
+                    String jsonPayload = buildIssueJson(summary, description, nomeClinica);
+                    enviarRequisicao(jsonPayload);
+                }
+                catch (Exception e) {
+                    System.out.println("Ocorreu um erro ao processar o alerta!");
+                    e.printStackTrace();
+                }
+            }
+        }
     }
 
     // --- MÉTODOS PRIVADOS DE SUPORTE ---
