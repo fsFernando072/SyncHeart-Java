@@ -1,4 +1,4 @@
-package school.sptech;
+package school.sptech.model;
 
 import java.time.LocalDateTime;
 
@@ -12,6 +12,7 @@ public class Log {
     private Double bateria;
     private Integer tarefas;
     private String listaTarefas;
+    private Integer id;
 
     public Log(LocalDateTime timestamp, String uuid, Boolean arritmia, Double cpu, Double ram, Double disco, Double bateria, Integer tarefas, String listaTarefas) {
         this.timestamp = timestamp;
@@ -95,6 +96,14 @@ public class Log {
 
     public void setListaTarefas(String listaTarefas) {
         this.listaTarefas = listaTarefas;
+    }
+
+    public Integer getId() {
+        return id;
+    }
+
+    public void setId(Integer id) {
+        this.id = id;
     }
 
     @Override

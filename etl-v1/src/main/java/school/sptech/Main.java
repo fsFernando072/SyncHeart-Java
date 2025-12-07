@@ -16,13 +16,24 @@ package school.sptech;
 
 
 // Importando as dependências necessárias
+import com.fasterxml.jackson.databind.SerializationFeature;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.core.BeanPropertyRowMapper;
+import school.sptech.database.DatabaseConfiguration;
+import school.sptech.jira.JiraTicketCreator;
+import school.sptech.model.Clinica;
+import school.sptech.model.Log;
+import school.sptech.model.Modelo;
+import school.sptech.model.Parametro;
 import software.amazon.awssdk.regions.Region;
 import software.amazon.awssdk.services.s3.S3Client;
 import software.amazon.awssdk.services.s3.model.*;
 import software.amazon.awssdk.transfer.s3.S3TransferManager;
 import software.amazon.awssdk.transfer.s3.model.*;
+
+import com.fasterxml.jackson.databind.ObjectMapper;
+
+import school.sptech.dto.*;
 
 import java.io.*;
 import java.nio.file.Files;
@@ -30,7 +41,6 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
-import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
@@ -46,9 +56,10 @@ public class Main {
         // Estabelecendo conexão com a AWS
         S3Client s3Client = S3Client.builder().region(Region.US_EAST_1).build();
 
-        baixarArquivos(s3Client, 1, "arquivos");
+        baixarArquivos(s3Client, 2, "arquivos");
         tratarDadosRaw();
-        enviarArquivos(s3Client, 2, "arquivos_tratados");
+        enviarArquivos(s3Client, 3, "arquivos_tratados");
+        enviarArquivos(s3Client, 1, "arquivos_client");
 
     }
 
@@ -72,6 +83,7 @@ public class Main {
             for (S3Object arquivo : res.contents()) {
 
                 Path destino = pasta.resolve(arquivo.key());
+                Files.createDirectories(destino.getParent());
 
                 S3TransferManager transferManager = S3TransferManager.builder()
                         .build();
@@ -186,7 +198,7 @@ public class Main {
 
                                 alertasCpu.add(log);
                                 int valor = parametro.getDuracaoMinutos() * 60;
-                              jiraTicketCreator.criarTickets(alertasCpu,  m.getId(), log.getCpu(), valor, "CPU", c.getNome());
+                                jiraTicketCreator.criarTickets(alertasCpu,  m.getId(), log.getCpu(), valor, "CPU", c.getNome());
                             }
                             else if (parametro.getMetrica().equals("RAM") && log.getRam() >= parametro.getLimiarValor()) {
                                 alertasRam.add(log);
@@ -446,6 +458,60 @@ public class Main {
                 }
 
                 atualizarUltimaCaptura(logsFiltrados.getLast());
+
+                //Criação do Json
+                try {
+                    String[] caminhoDividido = caminhoCompleto.split("/");
+                    caminhoDividido[0] = "arquivos_client";
+
+                    String caminhoCompletoAlterado = String.join("/", caminhoDividido);
+
+                    Path pasta = Paths.get(caminhoCompletoAlterado);
+                    Files.createDirectories(pasta);
+
+                    Log ultimaCaptura = logsFiltrados.getLast();
+                    int indiceInicio = logsFiltrados.size() - 7;
+                    List<Log> ultimosValores = logsFiltrados.subList(indiceInicio, logsFiltrados.size());
+
+                    DashboardEngDto dashboard = new DashboardEngDto();
+
+                    dashboard.kpiEng = new DashboardEngDto.KpiEng(ultimaCaptura.getBateria(), ultimaCaptura.getCpu(), ultimaCaptura.getRam(), ultimaCaptura.getDisco());
+
+                    dashboard.dashBateria = new DashboardEngDto.DashBateria();
+                    dashboard.dashCpuRam = new DashboardEngDto.DashCpuRam();
+                    dashboard.dashDisco = new DashboardEngDto.DashDisco();
+
+                    for (Log log : ultimosValores) {
+                        String[] horarioSeparado = log.getTimestamp().toString().split("T");
+
+                        dashboard.dashBateria.valores.add(log.getBateria().intValue());
+                        dashboard.dashBateria.projecao.add(log.getBateria().intValue() - 1);
+                        dashboard.dashBateria.labels.add(horarioSeparado[1]);
+
+                        dashboard.dashCpuRam.cpu.add(log.getCpu());
+                        dashboard.dashCpuRam.ram.add(log.getRam());
+                        dashboard.dashCpuRam.labels.add(horarioSeparado[1]);
+
+                        dashboard.dashDisco.disco.add(log.getDisco());
+                        dashboard.dashDisco.labels.add(horarioSeparado[1]);
+                    }
+
+                    try {
+                        ObjectMapper objectMapper = new ObjectMapper();
+                        objectMapper.enable(SerializationFeature.INDENT_OUTPUT);
+
+                        objectMapper.writeValue(new File(caminhoCompletoAlterado + "/dashboard.json"), dashboard);
+
+                    } catch (IOException e) {
+                        System.out.println("Ocorreu um erro ao escrever o arquivo Json");
+                        e.printStackTrace();
+                    }
+
+
+                } catch (IOException e) {
+                    System.out.println("Erro ao criar a pasta");
+                    e.printStackTrace();
+                }
 
 
     }

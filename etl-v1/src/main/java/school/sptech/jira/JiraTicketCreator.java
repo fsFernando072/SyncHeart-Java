@@ -1,6 +1,9 @@
-package school.sptech;
+package school.sptech.jira;
 
 import io.github.cdimascio.dotenv.Dotenv;
+import org.springframework.jdbc.core.JdbcTemplate;
+import school.sptech.database.DatabaseConfiguration;
+import school.sptech.model.Log;
 
 import java.io.IOException;
 import java.net.URI;
@@ -9,6 +12,9 @@ import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.net.http.HttpTimeoutException;
 import java.nio.charset.StandardCharsets;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
+import java.sql.SQLException;
 import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.*;
@@ -56,6 +62,8 @@ public class JiraTicketCreator {
      * Filtra a lista e cria um ticket no Jira para cada Alerta CRÍTICO.
      */
     public void criarTickets(List<Log> alertas, Integer idModelo, Double captura, int valor, String componente, String nomeClinica) {
+        DatabaseConfiguration databaseConfiguration = new DatabaseConfiguration();
+        JdbcTemplate template = new JdbcTemplate(databaseConfiguration.getDataSource());
 
         System.out.println("--- Iniciando verificação de alertas para o Jira ---");
 
@@ -89,6 +97,23 @@ public class JiraTicketCreator {
 
             if (diferencaTotalInt > valor) {
                 try {
+                    String slq = "SELECT dispositivo_id FROM Dispositivos WHERE dispositivo_uuid = ?";
+
+                    try {
+                        PreparedStatement preparedStatement = databaseConfiguration.getDataSource().getConnection().prepareStatement(slq);
+
+                        preparedStatement.setString(1, log.getUuid());
+
+                        try (ResultSet rs = preparedStatement.executeQuery()) {
+                            if (rs.next()) {
+                                Integer resultado = rs.getObject("dispositivo_id", Integer.class);
+                                log.setId(resultado);
+                            }
+                        }
+                    } catch (SQLException e) {
+                        throw new RuntimeException(e);
+                    }
+
                     String summary = String.format("%s ATINGIU %s%%", componente, captura);
                     String duracaoAlertaFormatado = duracaoAlerta.toString().replace("PT", " ");
                     String inicioFormatado = inicio.toString().replace("T", " ");
@@ -102,8 +127,9 @@ public class JiraTicketCreator {
                             Duração: %s
                             Valor detectado: %s%%
                             Horário: %s - %s
+                            Dispositivo_ID: %d
                             """,
-                            log.getUuid(), idModelo, componente, duracaoAlertaFormatado, captura, inicioFormatado, fimFormatado
+                            log.getUuid(), idModelo, componente, duracaoAlertaFormatado, captura, inicioFormatado, fimFormatado, log.getId()
                     );
 
                     String jsonPayload = buildIssueJson(summary, description, nomeClinica);
@@ -123,10 +149,28 @@ public class JiraTicketCreator {
     }
 
     public void criarTickets(List<Log> alertas, Integer idModelo, Double captura, String componente, String nomeClinica) {
+        DatabaseConfiguration databaseConfiguration = new DatabaseConfiguration();
+        JdbcTemplate template = new JdbcTemplate(databaseConfiguration.getDataSource());
 
         alertas.sort(Comparator.comparing(Log::getTimestamp));
 
         for (Log log : alertas) {
+            String slq = "SELECT dispositivo_id FROM Dispositivos WHERE dispositivo_uuid = ?";
+
+            try {
+                PreparedStatement preparedStatement = databaseConfiguration.getDataSource().getConnection().prepareStatement(slq);
+
+                preparedStatement.setString(1, log.getUuid());
+
+                try (ResultSet rs = preparedStatement.executeQuery()) {
+                    if (rs.next()) {
+                        Integer resultado = rs.getObject("dispositivo_id", Integer.class);
+                        log.setId(resultado);
+                    }
+                }
+            } catch (SQLException e) {
+                throw new RuntimeException(e);
+            }
 
                 String summary = String.format("Disco ATINGIU %s%%", captura);
 
@@ -138,8 +182,9 @@ public class JiraTicketCreator {
                             Componente: %s
                             Valor detectado: %s%%
                             Horário: %s
+                            Dispositivo_ID: %d
                             """,
-                            log.getUuid(), idModelo,  componente, log.getDisco(), log.getTimestamp()
+                            log.getUuid(), idModelo,  componente, log.getDisco(), log.getTimestamp(), log.getId()
                     );
 
                     String jsonPayload = buildIssueJson(summary, description, nomeClinica);
@@ -153,11 +198,30 @@ public class JiraTicketCreator {
     }
 
     public void criarTickets(List<Log> alertas, Integer idModelo, Double captura, String nomeClinica) {
+        DatabaseConfiguration databaseConfiguration = new DatabaseConfiguration();
+        JdbcTemplate template = new JdbcTemplate(databaseConfiguration.getDataSource());
         System.out.println("--- Iniciando verificação de alertas para o Jira ---");
+
 
         alertas.sort(Comparator.comparing(Log::getTimestamp));
 
         for (Log log : alertas) {
+            String slq = "SELECT dispositivo_id FROM Dispositivos WHERE dispositivo_uuid = ?";
+
+            try {
+                PreparedStatement preparedStatement = databaseConfiguration.getDataSource().getConnection().prepareStatement(slq);
+
+                preparedStatement.setString(1, log.getUuid());
+
+                try (ResultSet rs = preparedStatement.executeQuery()) {
+                    if (rs.next()) {
+                        Integer resultado = rs.getObject("dispositivo_id", Integer.class);
+                        log.setId(resultado);
+                    }
+                }
+            } catch (SQLException e) {
+                throw new RuntimeException(e);
+            }
 
                 String summary = String.format("Bateria ATINGIU %s%%", captura);
 
@@ -169,8 +233,9 @@ public class JiraTicketCreator {
                             Componente: %s
                             Valor detectado: %s%%
                             Horário: %s
+                            Dispositivo_ID: %d
                             """,
-                            log.getUuid(), idModelo, "Bateria", log.getBateria(), log.getTimestamp()
+                            log.getUuid(), idModelo, "Bateria", log.getBateria(), log.getTimestamp(), log.getId()
                     );
 
                     String jsonPayload = buildIssueJson(summary, description, nomeClinica);

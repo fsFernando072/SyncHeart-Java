@@ -1,4 +1,4 @@
-package school.sptech;
+package school.sptech.model;
 
 import java.util.ArrayList;
 import java.util.List;
